@@ -25,6 +25,8 @@ class ReportController
             $testRun->refresh();
         }
 
+        $this->validateReportPath($testRun->report_html_path, $testRun->id);
+
         $html = Storage::disk('local')->get($testRun->report_html_path);
 
         return response($html, 200, [
@@ -45,6 +47,8 @@ class ReportController
                 return $this->html($testRun);
             }
         }
+
+        $this->validateReportPath($testRun->report_pdf_path, $testRun->id);
 
         $filename = "test-report-{$testRun->project->client->slug}-{$testRun->project->slug}-run-{$testRun->id}.pdf";
 
@@ -77,8 +81,23 @@ class ReportController
             abort(404, 'Report not yet generated.');
         }
 
+        $this->validateReportPath($testRun->report_html_path, $testRun->id);
+
         $html = Storage::disk('local')->get($testRun->report_html_path);
 
         return response($html, 200, ['Content-Type' => 'text/html']);
+    }
+
+    /**
+     * Ensure the stored path belongs to this test run's directory.
+     * Guards against path traversal if the DB is ever tampered with.
+     */
+    private function validateReportPath(?string $path, int $runId): void
+    {
+        $expectedPrefix = "reports/run-{$runId}/";
+
+        if (!$path || !str_starts_with($path, $expectedPrefix)) {
+            abort(403, 'Invalid report path.');
+        }
     }
 }

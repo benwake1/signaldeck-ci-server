@@ -117,29 +117,29 @@ class RunCypressTestJob implements ShouldQueue
         $project = $this->run->project;
 
         if (is_dir($this->runPath)) {
-            $this->exec("rm -rf {$this->runPath}");
+            $this->exec('rm -rf ' . escapeshellarg($this->runPath));
         }
         mkdir($this->runPath, 0755, true);
 
-        $branch = $this->run->branch;
+        $branch  = $this->run->branch;
         $repoUrl = $project->repo_url;
 
         // Set up SSH key if provided
         $sshKeyPath = null;
         if ($project->deploy_key_private) {
-            $sshKeyPath = $this->setupSshKey($project->deploy_key_private);
-            $gitSshCommand = "GIT_SSH_COMMAND='ssh -i {$sshKeyPath} -o StrictHostKeyChecking=no'";
+            $sshKeyPath    = $this->setupSshKey($project->deploy_key_private);
+            $gitSshCommand = 'GIT_SSH_COMMAND=' . escapeshellarg("ssh -i {$sshKeyPath} -o StrictHostKeyChecking=no");
         } else {
             $gitSshCommand = '';
         }
 
         $this->log("🔄 Cloning {$repoUrl} (branch: {$branch})...");
 
-        $cloneCmd = "{$gitSshCommand} git clone --depth 1 --branch {$branch} {$repoUrl} {$this->runPath} 2>&1";
+        $cloneCmd = "{$gitSshCommand} git clone --depth 1 --branch " . escapeshellarg($branch) . ' ' . escapeshellarg($repoUrl) . ' ' . escapeshellarg($this->runPath) . ' 2>&1';
         $this->exec($cloneCmd);
 
         // Get commit SHA
-        $sha = trim($this->exec("git -C {$this->runPath} rev-parse HEAD 2>&1"));
+        $sha = trim($this->exec('git -C ' . escapeshellarg($this->runPath) . ' rev-parse HEAD 2>&1'));
         if (strlen($sha) === 40) {
             $this->run->update(['commit_sha' => substr($sha, 0, 8)]);
         }
@@ -162,7 +162,7 @@ class RunCypressTestJob implements ShouldQueue
     private function installDependencies(): void
     {
         $this->log("📦 Installing npm dependencies...");
-        $output = $this->exec("cd {$this->runPath} && npm install --prefer-offline 2>&1");
+        $this->exec('cd ' . escapeshellarg($this->runPath) . ' && npm install --prefer-offline 2>&1');
         $this->log("✅ Dependencies installed.");
     }
 
@@ -173,7 +173,7 @@ class RunCypressTestJob implements ShouldQueue
 
         if (isset($scripts['build:tailwind'])) {
             $this->log("🎨 Building Tailwind CSS...");
-            $this->exec("cd {$this->runPath} && npm run build:tailwind 2>&1");
+            $this->exec('cd ' . escapeshellarg($this->runPath) . ' && npm run build:tailwind 2>&1');
         }
     }
 
@@ -190,12 +190,16 @@ class RunCypressTestJob implements ShouldQueue
 
         $envString = '';
         foreach ($envVars as $key => $value) {
-            $envString .= "{$key}=" . escapeshellarg($value) . " ";
+            // Only allow valid shell variable names to prevent injection via keys
+            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key)) {
+                continue;
+            }
+            $envString .= "{$key}=" . escapeshellarg($value) . ' ';
         }
 
         // Build cypress command
         $specPattern = $suite->spec_pattern;
-        $cmd = "cd {$this->runPath} && {$envString} npx cypress run --spec \"{$specPattern}\" 2>&1";
+        $cmd = 'cd ' . escapeshellarg($this->runPath) . " && {$envString} npx cypress run --spec " . escapeshellarg($specPattern) . ' 2>&1';
 
         $this->log("🧪 Running Cypress tests...");
         $this->log("   Spec pattern: {$specPattern}");
@@ -272,7 +276,7 @@ class RunCypressTestJob implements ShouldQueue
             throw new \RuntimeException("No mochawesome JSON files found in {$reportDir}");
         }
 
-        $this->exec("cd {$this->runPath} && npx mochawesome-merge mochawesome-report/*.json -o merged.json 2>&1");
+        $this->exec('cd ' . escapeshellarg($this->runPath) . ' && npx mochawesome-merge mochawesome-report/*.json -o merged.json 2>&1');
 
         if (!file_exists($mergedPath)) {
             throw new \RuntimeException("Failed to create merged.json");
@@ -308,7 +312,7 @@ class RunCypressTestJob implements ShouldQueue
     private function cleanup(): void
     {
         if (is_dir($this->runPath)) {
-            $this->exec("rm -rf {$this->runPath}");
+            $this->exec('rm -rf ' . escapeshellarg($this->runPath));
         }
     }
 

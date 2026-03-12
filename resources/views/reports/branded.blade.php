@@ -9,10 +9,14 @@
            BRANDED TEST REPORT — Print & Web Ready
            Uses client branding colours from DB
         ============================================ */
+        @php
+            // Sanitise colours to valid hex only — prevents CSS injection
+            $safeColour = fn($c) => preg_match('/^#[0-9A-Fa-f]{3,8}$/', trim($c)) ? trim($c) : '#1e40af';
+        @endphp
         :root {
-            --primary:   {{ $client->primary_colour }};
-            --secondary: {{ $client->secondary_colour }};
-            --accent:    {{ $client->accent_colour }};
+            --primary:   {{ $safeColour($client->primary_colour) }};
+            --secondary: {{ $safeColour($client->secondary_colour) }};
+            --accent:    {{ $safeColour($client->accent_colour) }};
             --pass:      #16a34a;
             --fail:      #dc2626;
             --warn:      #d97706;
