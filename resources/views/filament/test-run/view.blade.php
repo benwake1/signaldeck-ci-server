@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     <div
-        x-data="testRunViewer(@js($record->id), @js($record->status), @js($record->isRunning()))"
+        x-data="testRunViewer(@js($record->id), @js($record->status), @js($record->isRunning()), @js($record->log_output ?? ''))"
         data-run-status="{{ $record->status }}"
         x-init="init()"
         @if($record->isRunning()) wire:poll.3000ms="pollStatus" @endif
@@ -61,10 +61,9 @@
                 </div>
                 <div
                     id="log-container"
-                    class="bg-gray-950 p-4 h-96 overflow-y-auto font-mono text-xs text-gray-300 whitespace-pre-wrap"
+                    class="bg-gray-950 p-4 h-96 overflow-y-auto overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre"
                     x-ref="logContainer"
-                    x-init="$el.scrollTop = $el.scrollHeight"
-                >{{ $record->log_output ?? 'Waiting for output...' }}</div>
+                ><span class="text-gray-500" x-show="!initialLog">Waiting for output...</span></div>
             </div>
 
             {{-- Test Results --}}
@@ -222,12 +221,34 @@
     </div>
 
     @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/ansi_up@6/ansi_up.min.js"></script>
     <script>
-        function testRunViewer(runId, initialStatus, initiallyRunning) {
+        function testRunViewer(runId, initialStatus, initiallyRunning, initialLog) {
             return {
                 runId: runId,
                 status: initialStatus,
                 isRunning: initiallyRunning,
+                initialLog: initialLog,
+
+                _ansiUp: null,
+                getAnsiUp() {
+                    if (!this._ansiUp && typeof AnsiUp !== 'undefined') {
+                        const au = new AnsiUp();
+                        au.use_classes = false;
+                        this._ansiUp = au;
+                    }
+                    return this._ansiUp;
+                },
+                ansiToHtml(text) {
+                    const au = this.getAnsiUp();
+                    // Normalise line endings (\r\n and bare \r → \n)
+                    const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    const html = au
+                        ? au.ansi_to_html(normalised)
+                        : normalised.replace(/\x1b\[[0-9;]*m/g, '');
+                    // Explicit <br> so line breaks survive innerHTML assignment
+                    return html.replace(/\n/g, '<br>');
+                },
 
                 // Media lightbox
                 lightbox: { open: false, type: null, url: null },
@@ -263,6 +284,13 @@
                 },
 
                 init() {
+                    // Render initial log output directly from the JS variable
+                    const container = this.$refs.logContainer;
+                    if (container && this.initialLog) {
+                        container.innerHTML = this.ansiToHtml(this.initialLog);
+                        container.scrollTop = container.scrollHeight;
+                    }
+
                     // Sync Alpine status from Livewire pollStatus() dispatches
                     window.addEventListener('run-status-updated', (e) => {
                         const newStatus = e.detail.status;
@@ -284,7 +312,7 @@
                         .listen('.log.received', (e) => {
                             const container = this.$refs.logContainer;
                             if (container) {
-                                container.textContent += '\n' + e.message;
+                                container.innerHTML += this.ansiToHtml(e.message) + '<br>';
                                 container.scrollTop = container.scrollHeight;
                             }
                         })
