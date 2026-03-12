@@ -6,6 +6,8 @@
 /public/build/
 /public/hot
 /public/storage
+/public/css/
+/public/js/
 /bootstrap/cache/*.php
 /storage/*.key
 

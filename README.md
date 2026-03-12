@@ -722,6 +722,9 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# Publish Filament assets (CSS/JS)
+php artisan filament:assets
+
 # Ensure storage symlink exists
 php artisan storage:link
 
