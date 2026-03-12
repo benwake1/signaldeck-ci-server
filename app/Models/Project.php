@@ -90,7 +90,7 @@ class Project extends Model
     {
         $keyPath = tempnam(sys_get_temp_dir(), 'ssh_key_');
         unlink($keyPath); // ssh-keygen won't overwrite an existing file
-        exec("ssh-keygen -t ed25519 -C 'cypress-dashboard' -f {$keyPath} -N '' -q 2>&1", $output, $exitCode);
+        exec("ssh-keygen -t ed25519 -C '" . config('app.name') . "' -f {$keyPath} -N '' -q 2>&1", $output, $exitCode);
 
         if ($exitCode !== 0 || !file_exists($keyPath) || !file_exists($keyPath . '.pub')) {
             throw new \RuntimeException('ssh-keygen failed: ' . implode("\n", $output));

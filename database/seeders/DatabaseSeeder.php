@@ -69,7 +69,7 @@ class DatabaseSeeder extends Seeder
                 'client_id'      => $clientA->id,
                 'name'           => 'Acme eCommerce',
                 'description'    => 'End-to-end tests for the Acme online store.',
-                'repo_url'       => 'git@github.com:benwake1/dummy-reporting.git',
+                'repo_url'       => 'git@github.com:your-org/your-repo.git',
                 'repo_provider'  => 'github',
                 'default_branch' => 'main',
                 'active'         => true,

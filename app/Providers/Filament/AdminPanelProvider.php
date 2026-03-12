@@ -42,7 +42,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
                 'info'    => Color::Sky,
             ])
-            ->brandName('Cypress Dashboard')
+            ->brandName(config('app.name'))
             ->brandLogo(null)
             ->favicon(null)
             ->darkMode(true)

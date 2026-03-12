@@ -752,7 +752,7 @@ sudo supervisorctl restart cypress-reverb
 ### First push to a new repo
 
 ```bash
-cd /Users/benwake/Sites/cypress-dashboard
+cd /path/to/your/project
 
 # Initialise git
 git init -b main
