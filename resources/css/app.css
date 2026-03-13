@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Cypress Dashboard — global styles */
 /* Filament handles most styling; this file is for any overrides */
