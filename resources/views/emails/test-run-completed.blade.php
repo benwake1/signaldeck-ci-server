@@ -34,11 +34,15 @@
 
                 {{-- Status bar --}}
                 <tr>
-                    <td style="background:{{ $statusBg }};padding:14px 32px;text-align:center;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+                    <td style="background:{{ $statusBg }};padding:14px 32px;text-align:center;border-radius: 12px">
                         <span style="font-size:15px;font-weight:700;color:{{ $statusColor }};">{{ $statusLabel }}</span>
                     </td>
                 </tr>
-
+                <tr>
+                    <td style="padding: 20px;">
+                        <br />
+                    </td>
+                </tr>
                 {{-- Card body --}}
                 <tr>
                     <td style="background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
