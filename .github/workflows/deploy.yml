@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 jobs:
   deploy:
@@ -20,5 +22,6 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           script: |
             cd /var/www/cypress-dashboard
+            git fetch --tags origin
             git pull origin main
-            bash deploy.sh
+            APP_VERSION="${{ github.ref_type == 'tag' && github.ref_name || '' }}" bash deploy.sh

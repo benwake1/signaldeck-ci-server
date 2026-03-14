@@ -232,6 +232,7 @@ APP_ENV=production
 APP_KEY=
 APP_DEBUG=false
 APP_URL=https://${DOMAIN}
+APP_VERSION=dev
 
 LOG_CHANNEL=stack
 LOG_LEVEL=error
@@ -275,6 +276,7 @@ BRAND_PRIMARY_COLOR=
 BRAND_LOGO_PATH=
 BRAND_LOGO_HEIGHT=2rem
 BRAND_FAVICON_PATH=
+COMPANY_LEGAL_NAME=
 
 # Node binary paths — update if different on this server
 NODE_PATH=$(which node)

@@ -25,6 +25,10 @@ npm run build --silent
 echo "▶ Running database migrations..."
 ${PHP} artisan migrate --force
 
+echo "▶ Setting app version from git tag..."
+APP_VERSION="${APP_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")}"
+sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env
+
 echo "▶ Caching config, routes and views..."
 ${PHP} artisan config:cache
 ${PHP} artisan route:cache

@@ -8,4 +8,5 @@ return [
     'logo_dark_path'  => env('BRAND_LOGO_DARK_PATH'),
     'logo_height'     => env('BRAND_LOGO_HEIGHT', '2rem'),
     'favicon_path'    => env('BRAND_FAVICON_PATH'),
+    'version'         => env('APP_VERSION', 'dev'),
 ];
