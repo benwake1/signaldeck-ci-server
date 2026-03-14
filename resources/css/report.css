@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../views/reports/branded.blade.php";
 
 @layer utilities {
     .print-exact {

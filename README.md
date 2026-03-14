@@ -72,11 +72,11 @@ Install the following before running the application:
 
 | Requirement | Notes |
 |---|---|
-| PHP 8.2+ | Extensions: `pdo`, `openssl`, `mbstring`, `xml`, `curl`, `redis` |
+| PHP 8.2+ | Extensions: `pdo`, `openssl`, `mbstring`, `xml`, `curl` |
 | Composer | PHP dependency manager |
 | Node.js 18+ | Runtime for Vite and Cypress |
 | npm | Package manager for frontend and Cypress |
-| Redis | Required for queue and cache |
+| Redis | Required for production. Not needed locally — see Queue, Cache & Session below |
 | Git | For cloning test repositories |
 | SSH | Required if using private Git repositories |
 
@@ -89,30 +89,33 @@ Install the following before running the application:
 git clone <your-repo-url> cypress-dashboard
 cd cypress-dashboard
 
-# 2. Install PHP dependencies
+# 2. Create required directories (excluded from git, needed before composer install)
+mkdir -p bootstrap/cache storage/framework/{sessions,views,cache} storage/logs
+
+# 3. Install PHP dependencies
 composer install
 
-# 3. Install Node dependencies
+# 4. Install Node dependencies
 npm install
 
-# 4. Copy the environment file
+# 5. Copy the environment file
 cp .env.example .env
 
-# 5. Generate the application key
+# 6. Generate the application key
 php artisan key:generate
 
-# 6. Configure .env (see Environment Variables section)
+# 7. Configure .env (see Environment Variables section)
 
-# 7. Create the SQLite database file (if using SQLite)
+# 8. Create the SQLite database file (if using SQLite)
 touch database/database.sqlite
 
-# 8. Run migrations and seed demo data
+# 9. Run migrations and seed demo data
 php artisan migrate --seed
 
-# 9. Create the public storage symlink
+# 10. Create the public storage symlink
 php artisan storage:link
 
-# 10. Build frontend assets
+# 11. Build frontend assets
 npm run build
 ```
 
@@ -131,6 +134,8 @@ php artisan reverb:start
 # Terminal 4 — Vite dev server (hot module reloading)
 npm run dev
 ```
+
+> **Report CSS:** The branded HTML report inlines its CSS from the compiled Vite build (`public/build/`). `npm run dev` does **not** update report styles — run `npm run build` then regenerate the report to see changes to `branded.blade.php`.
 
 > **Shortcut:** A `Procfile` is included for use with [hivemind](https://github.com/DarthSim/hivemind) or [overmind](https://github.com/DarthSim/overmind). Run `hivemind` from the project root to start the queue worker and Reverb together.
 
@@ -170,6 +175,17 @@ DB_DATABASE=/absolute/path/to/database/database.sqlite
 
 ### Queue, Cache & Session
 
+For **local development** (no Redis required):
+
+```env
+QUEUE_CONNECTION=database
+CACHE_STORE=file
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+```
+
+For **production** (Redis recommended):
+
 ```env
 QUEUE_CONNECTION=redis
 CACHE_STORE=redis
@@ -180,6 +196,8 @@ REDIS_HOST=127.0.0.1
 REDIS_PASSWORD=null
 REDIS_PORT=6379
 ```
+
+> If using `QUEUE_CONNECTION=database` locally, run `php artisan queue:table && php artisan migrate` to create the jobs table.
 
 ### Broadcasting (Reverb WebSocket)
 

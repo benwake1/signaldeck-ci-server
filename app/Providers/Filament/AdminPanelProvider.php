@@ -42,8 +42,9 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
                 'info'    => Color::Sky,
             ])
-            ->brandName(env('BRAND_NAME', config('app.name')))
+            ->brandName(env('BRAND_NAME') ?: config('app.name'))
             ->brandLogo(env('BRAND_LOGO_PATH') ? asset(env('BRAND_LOGO_PATH')) : null)
+            ->darkModeBrandLogo(asset(env('BRAND_LOGO_DARK_PATH') ?: env('BRAND_LOGO_PATH') ?: '')  ?: null)
             ->brandLogoHeight(env('BRAND_LOGO_HEIGHT', '2rem'))
             ->favicon(env('BRAND_FAVICON_PATH') ? asset(env('BRAND_FAVICON_PATH')) : null)
             ->darkMode(true)

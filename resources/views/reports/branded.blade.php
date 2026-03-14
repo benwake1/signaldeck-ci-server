@@ -21,6 +21,7 @@
         .grad { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); }
         .print-btn-bg { background-color: var(--primary); }
         .screenshot-img:hover { box-shadow: 0 0 0 3px var(--primary); }
+        .custom-border {border-color: var(--primary); }
 
         /* Decorative header orb (pseudo-element can't be done with Tailwind) */
         .report-header::after {
@@ -51,15 +52,15 @@
     <div class="report-header grad text-white relative overflow-hidden px-6 py-8 md:px-12 md:py-10 print-exact">
 
         {{-- Logo row + meta --}}
-        <div class="flex flex-col gap-4 mb-8 md:flex-row md:justify-between md:items-start">
+        <div class="flex flex-col gap-4 mb-8 md:flex-row md:justify-between md:items-start max-w-7xl mx-auto">
 
             {{-- Logos --}}
             <div class="flex items-center gap-5">
-                <div class="text-lg font-bold tracking-tight">🧪 QA Dashboard</div>
+                <div class="text-lg font-bold tracking-tight">{{ env('BRAND_NAME') ?: config('app.name') }} QA Report</div>
                 <div class="w-px h-10 bg-white/30 shrink-0"></div>
                 @if($client->logo_path)
                     <img src="{{ Storage::url($client->logo_path) }}" alt="{{ $client->name }}"
-                         class="h-12 w-auto object-contain bg-white/15 rounded-lg px-3 py-1.5">
+                         class="h-20 w-auto object-contain bg-white rounded-lg px-3 py-2">
                 @else
                     <div class="text-lg font-bold opacity-90">{{ $client->name }}</div>
                 @endif
@@ -73,11 +74,12 @@
                 @if($run->commit_sha)
                     <div><strong>Commit:</strong> <span class="font-code">{{ $run->commit_sha }}</span></div>
                 @endif
+                <div><strong>Powered By:</strong> Cypress</div>
             </div>
         </div>
 
-        <div class="text-3xl font-extrabold tracking-tight mb-2 md:text-4xl">{{ $project->name }}</div>
-        <div class="text-base opacity-80">
+        <div class="text-3xl font-extrabold tracking-tight mb-2 md:text-4xl max-w-7xl mx-auto">{{ $project->name }}</div>
+        <div class="text-base opacity-80 max-w-7xl mx-auto">
             Test Suite: {{ $suite->name }} &nbsp;·&nbsp;
             Branch: {{ $run->branch }} &nbsp;·&nbsp;
             Triggered by: {{ $run->triggeredBy->name }}
@@ -85,7 +87,7 @@
     </div>
 
     {{-- ===== SUMMARY ===== --}}
-    <div class="bg-white border-b border-gray-200 px-6 py-8 md:px-12">
+    <div class="bg-white border-b border-gray-200 px-6 py-8 md:px-12 max-w-7xl mx-auto">
 
         <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 class="text-base font-bold text-gray-700">Executive Summary</h2>
@@ -109,7 +111,7 @@
                 <div class="text-4xl font-extrabold leading-none mb-1.5 text-blue-600">{{ $run->total_tests }}</div>
                 <div class="text-xs font-semibold uppercase tracking-widest text-gray-500">Total</div>
             </div>
-            <div class="rounded-xl p-5 text-center border border-gray-200 bg-gray-50 print-exact">
+            <div class="rounded-xl p-5 text-center border border-gray-200 bg-gray-50  {{ $run->pass_rate >= 80 ? 'bg-green-200 border-green-200' : ($run->pass_rate >= 60 ? 'bg-yellow-200 border-yellow-200' : 'bg-red-200 border-red-200') }} print-exact">
                 <div class="text-4xl font-extrabold leading-none mb-1.5
                     {{ $run->pass_rate >= 80 ? 'text-green-600' : ($run->pass_rate >= 60 ? 'text-yellow-600' : 'text-red-600') }}">
                     {{ $run->pass_rate }}%
@@ -145,7 +147,7 @@
 
     {{-- ===== FAILED TESTS ===== --}}
     @if($failedResults->count() > 0)
-    <div class="bg-white border-b border-gray-200 px-6 py-8 md:px-12">
+    <div class="bg-white border-b border-gray-200 px-6 py-8 md:px-12 max-w-7xl mx-auto">
 
         <div class="flex items-center gap-2.5 mb-5 pb-3 border-b-2 border-gray-200">
             <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-base shrink-0">❌</div>
@@ -209,7 +211,7 @@
     @endif
 
     {{-- ===== ALL RESULTS BY SPEC ===== --}}
-    <div class="bg-white border-b border-gray-200 px-6 py-8 md:px-12">
+    <div class="bg-white border-b border-gray-200 px-6 py-8 md:px-12 max-w-7xl mx-auto">
 
         <div class="flex items-center gap-2.5 mb-5 pb-3 border-b-2 border-gray-200">
             <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-base shrink-0">📋</div>
@@ -273,23 +275,33 @@
     </div>
 
     {{-- ===== FOOTER ===== --}}
-    <div class="grad text-white text-xs px-6 py-6 flex flex-col gap-3 md:flex-row md:justify-between md:items-center md:px-12 print-exact">
-        <div class="opacity-85 leading-relaxed">
-            @if($client->report_footer_text)
-                <p>{{ $client->report_footer_text }}</p>
-            @else
-                <p>This report was automatically generated by QA Dashboard.</p>
-                <p>For questions about this report, please contact your account manager.</p>
-            @endif
+    <div class="grad text-white relative overflow-hidden px-6 py-8 md:px-12 md:py-10 print-exact">
+        <div class="flex flex-col py-6 gap-3 md:flex-row md:justify-between md:items-center md:px-12 max-w-7xl mx-auto">
+            <div class="opacity-85 leading-relaxed">
+                @if($client->report_footer_text)
+                    <p>{{ $client->report_footer_text }}</p>
+                @else
+                    <p>This report was automatically generated by QA Dashboard.</p>
+                    <p>For questions about this report, please contact your account manager.</p>
+                @endif
+            </div>
+            <div class="opacity-85 leading-relaxed md:text-right">
+                <p><strong>{{ $client->name }}</strong></p>
+                @if($client->contact_email)
+                    <p>{{ $client->contact_email }}</p>
+                @endif
+                <p>Generated {{ $generatedAt->format('d M Y \a\t H:i') }}</p>
+            </div>
         </div>
-        <div class="opacity-85 leading-relaxed md:text-right">
-            <p><strong>{{ $client->name }}</strong></p>
-            @if($client->contact_email)
-                <p>{{ $client->contact_email }}</p>
-            @endif
-            <p>Generated {{ $generatedAt->format('d M Y \a\t H:i') }}</p>
+        <div class="flex flex-col gap-3 py-6 md:items-center md:px-12 max-w-7xl mx-auto border-t custom-border">
+            <div class="opacity-85 leading-relaxed md:text-center">
+                <p>This report was automatically generated by {{ env('BRAND_NAME') ?: config('app.name') }} QA Report.</p>
+                <p>For questions about this report, please contact your project manager.</p>
+                <p>&copy; <?= date('Y');?> - All Rights Reserved - {{ env('COMPANY_LEGAL_NAME') ?: config('app.name') }}</p>
+            </div>
         </div>
     </div>
+
 
     {{-- ===== PRINT BUTTON (hidden on print) ===== --}}
     <button onclick="window.print()"
