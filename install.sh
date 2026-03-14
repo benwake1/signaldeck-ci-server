@@ -400,7 +400,7 @@ header "Step 9 — Supervisor"
 info "Writing Supervisor config..."
 cat > /etc/supervisor/conf.d/cypress-dashboard.conf <<SUPERVISOR
 [program:cypress-queue]
-command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=1 --timeout=3600
+command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=1 --timeout=14400
 directory=${APP_DIR}
 user=${APP_USER}
 umask=002
