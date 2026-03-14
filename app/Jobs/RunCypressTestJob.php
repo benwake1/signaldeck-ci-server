@@ -38,14 +38,17 @@ class RunCypressTestJob implements ShouldQueue
 
             // 1. Clone the repository
             $this->cloneRepo();
+            $this->checkCancelled();
 
             $this->updateStatus(TestRun::STATUS_INSTALLING);
 
             // 2. Install npm dependencies
             $this->installDependencies();
+            $this->checkCancelled();
 
             // 3. Build Tailwind (for report styling) if script exists
             $this->buildTailwind();
+            $this->checkCancelled();
 
             $this->updateStatus(TestRun::STATUS_RUNNING);
             $this->run->update(['started_at' => now()]);
@@ -84,6 +87,12 @@ class RunCypressTestJob implements ShouldQueue
             broadcast(new TestRunStatusChanged($this->run->fresh()));
 
         } catch (\Exception $e) {
+            // Don't overwrite a deliberate cancellation with an error status
+            if ($this->run->fresh()->status === TestRun::STATUS_CANCELLED) {
+                $this->log('🛑 Run was cancelled.');
+                return;
+            }
+
             Log::error('Cypress run failed', [
                 'run_id' => $this->run->id,
                 'error' => $e->getMessage(),
@@ -164,7 +173,11 @@ class RunCypressTestJob implements ShouldQueue
 
         if (isset($scripts['build:tailwind'])) {
             $this->log("🎨 Building Tailwind CSS...");
-            $this->exec('cd ' . escapeshellarg($this->runPath) . ' && npm run build:tailwind 2>&1');
+            try {
+                $this->exec('cd ' . escapeshellarg($this->runPath) . ' && npm run build:tailwind 2>&1');
+            } catch (\RuntimeException $e) {
+                $this->log("⚠️ Tailwind build skipped: " . $e->getMessage());
+            }
         }
     }
 
@@ -215,6 +228,16 @@ class RunCypressTestJob implements ShouldQueue
         stream_set_blocking($pipes[2], false);
 
         while (true) {
+            // Check for cancellation each tick
+            if ($this->run->fresh()->status === TestRun::STATUS_CANCELLED) {
+                proc_terminate($process, 9);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                proc_close($process);
+                $this->run->update(['log_output' => $fullLog]);
+                throw new \RuntimeException('Run cancelled by user.');
+            }
+
             $read = [$pipes[1], $pipes[2]];
             $write = null;
             $except = null;
@@ -276,6 +299,13 @@ class RunCypressTestJob implements ShouldQueue
         return $mergedPath;
     }
 
+    private function checkCancelled(): void
+    {
+        if ($this->run->fresh()->status === TestRun::STATUS_CANCELLED) {
+            throw new \RuntimeException('Run cancelled by user.');
+        }
+    }
+
     private function updateStatus(string $status): void
     {
         $this->run->update(['status' => $status]);
@@ -297,7 +327,13 @@ class RunCypressTestJob implements ShouldQueue
         $output = [];
         $returnCode = 0;
         exec($command, $output, $returnCode);
-        return implode("\n", $output);
+        $result = implode("\n", $output);
+
+        if ($returnCode !== 0) {
+            throw new \RuntimeException("Command failed (exit {$returnCode}): {$result}");
+        }
+
+        return $result;
     }
 
     private function cleanup(): void
