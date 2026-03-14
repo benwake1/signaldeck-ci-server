@@ -33,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
                 'mail_host'         => 'mail.mailers.smtp.host',
                 'mail_port'         => 'mail.mailers.smtp.port',
                 'mail_username'     => 'mail.mailers.smtp.username',
+                'mail_password'     => 'mail.mailers.smtp.password',
                 'mail_encryption'   => 'mail.mailers.smtp.encryption',
             ];
 

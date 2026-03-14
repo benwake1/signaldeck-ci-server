@@ -7,6 +7,7 @@ use App\Mail\TestRunCompletedMailable;
 use App\Models\AppSetting;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 
 class SendTestRunCompletedEmail implements ShouldQueue
@@ -38,6 +39,12 @@ class SendTestRunCompletedEmail implements ShouldQueue
         }
         Cache::put($cacheKey, true, now()->addMinutes(10));
 
+        // Re-apply mail settings fresh from DB — the queue worker may have booted
+        // before settings were saved or changed in the admin panel.
+        // Purge the cached transport so the new config is actually used.
+        $this->applyMailSettings();
+        Mail::purge(config('mail.default'));
+
         // Send to whoever triggered the run
         $recipient = $run->triggeredBy;
         if (! $recipient?->email) {
@@ -45,5 +52,26 @@ class SendTestRunCompletedEmail implements ShouldQueue
         }
 
         Mail::to($recipient)->send(new TestRunCompletedMailable($run));
+    }
+
+    private function applyMailSettings(): void
+    {
+        $map = [
+            'mail_mailer'       => 'mail.default',
+            'mail_from_address' => 'mail.from.address',
+            'mail_from_name'    => 'mail.from.name',
+            'mail_host'         => 'mail.mailers.smtp.host',
+            'mail_port'         => 'mail.mailers.smtp.port',
+            'mail_username'     => 'mail.mailers.smtp.username',
+            'mail_password'     => 'mail.mailers.smtp.password',
+            'mail_encryption'   => 'mail.mailers.smtp.encryption',
+        ];
+
+        foreach ($map as $setting => $configKey) {
+            $value = AppSetting::get($setting);
+            if ($value !== null && $value !== '') {
+                Config::set($configKey, $value);
+            }
+        }
     }
 }
