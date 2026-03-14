@@ -13,9 +13,13 @@ class TestRunStatusChanged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public string $status;
+
     public function __construct(
         public readonly TestRun $run
-    ) {}
+    ) {
+        $this->status = $run->status;
+    }
 
     public function broadcastOn(): array
     {

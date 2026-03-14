@@ -33,6 +33,33 @@ class ViewTestRun extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('cancel_run')
+                ->label('Cancel Run')
+                ->icon('heroicon-o-stop-circle')
+                ->color('danger')
+                ->visible(fn () => $this->record->isRunning())
+                ->requiresConfirmation()
+                ->modalHeading('Cancel this test run?')
+                ->modalDescription('The running Cypress process will be terminated. This cannot be undone.')
+                ->action(function () {
+                    $this->record->update([
+                        'status'        => TestRun::STATUS_CANCELLED,
+                        'finished_at'   => now(),
+                        'error_message' => 'Cancelled by ' . auth()->user()->name,
+                    ]);
+
+                    $this->record = $this->record->fresh();
+
+                    broadcast(new \App\Events\TestRunStatusChanged($this->record));
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Run cancelled')
+                        ->warning()
+                        ->send();
+
+                    $this->redirect(ViewTestRun::getUrl(['record' => $this->record]));
+                }),
+
             Actions\Action::make('share_report')
                 ->label('Share Link')
                 ->icon('heroicon-o-link')

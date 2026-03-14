@@ -278,6 +278,16 @@ BRAND_LOGO_HEIGHT=2rem
 BRAND_FAVICON_PATH=
 COMPANY_LEGAL_NAME=
 
+# Mail
+MAIL_MAILER=smtp
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=
+MAIL_FROM_NAME="Cypress Dashboard"
+
 # Node binary paths — update if different on this server
 NODE_PATH=$(which node)
 NPM_PATH=$(which npm)
@@ -390,7 +400,7 @@ header "Step 9 — Supervisor"
 info "Writing Supervisor config..."
 cat > /etc/supervisor/conf.d/cypress-dashboard.conf <<SUPERVISOR
 [program:cypress-queue]
-command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=3 --timeout=300
+command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=1 --timeout=14400
 directory=${APP_DIR}
 user=${APP_USER}
 umask=002
