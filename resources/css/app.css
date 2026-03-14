@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* Cypress Dashboard — global styles */
+/* Filament handles most styling; this file is for any overrides */
+
+/* Alpine.js cloak — hide elements before Alpine initialises */
+[x-cloak] { display: none !important; }
+
+/* Monospace log output */
+#log-container {
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* Smooth spin animation for running status */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}

@@ -1,0 +1,87 @@
+# -----------------------------------------------
+# Laravel
+# -----------------------------------------------
+/vendor/
+/node_modules/
+/public/build/
+/public/hot
+/public/storage
+/public/css/
+/public/js/
+/bootstrap/cache/*.php
+/storage/*.key
+
+# -----------------------------------------------
+# Environment & secrets — NEVER commit these
+# -----------------------------------------------
+.env
+.env.*
+!.env.example
+auth.json
+client_secret_*.json
+
+# -----------------------------------------------
+# Database files
+# -----------------------------------------------
+/database/database.sqlite
+/database/*.sqlite
+/database/*.sqlite-shm
+/database/*.sqlite-wal
+
+# -----------------------------------------------
+# Runtime storage — generated at runtime
+# -----------------------------------------------
+/storage/app/private/
+/storage/app/public/runs/
+/storage/app/public/clients/
+/storage/app/public/reports/
+/storage/app/reports/
+/storage/logs/
+/storage/framework/cache/
+/storage/framework/sessions/
+/storage/framework/views/
+/storage/framework/testing/
+
+# -----------------------------------------------
+# SSH deploy keys (written to disk by the app)
+# -----------------------------------------------
+*.pem
+*.key
+id_ed25519
+id_rsa
+
+# -----------------------------------------------
+# Cypress / Node test artifacts
+# -----------------------------------------------
+/tmp/
+cypress/videos/
+cypress/screenshots/
+mochawesome-report/
+
+# -----------------------------------------------
+# PHPUnit
+# -----------------------------------------------
+/.phpunit.cache/
+.phpunit.result.cache
+
+# -----------------------------------------------
+# IDE & editor
+# -----------------------------------------------
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# -----------------------------------------------
+# Logs & debugging
+# -----------------------------------------------
+npm-debug.log
+yarn-error.log
+*.log
+
+# -----------------------------------------------
+# Local dev tools (not relevant to production)
+# -----------------------------------------------
+Homestead.json
+Homestead.yaml

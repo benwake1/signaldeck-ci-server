@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@source "../views/reports/branded.blade.php";
+
+@layer utilities {
+    .print-exact {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
