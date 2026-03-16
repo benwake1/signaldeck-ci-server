@@ -1,5 +1,14 @@
 <x-filament-panels::page>
-    <style>@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
+    <style>
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes skeletonPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .log-line { animation: fadeIn 0.35s ease forwards; font-size: 0.75rem; line-height: 1.6; white-space: pre; }
+        .log-green  { color: #4ade80; }
+        .log-cyan   { color: #67e8f9; }
+        .log-yellow { color: #fbbf24; }
+        .log-dim    { color: #6b7280; }
+    </style>
     <div
         x-data="testRunViewer(@js($record->id), @js($record->status), @js($record->isRunning()), @js($record->log_output ?? ''))"
         data-run-status="{{ $record->status }}"
@@ -81,7 +90,42 @@
                     id="log-container"
                     class="bg-gray-950 p-4 h-96 overflow-y-auto overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre"
                     x-ref="logContainer"
-                ><span class="text-gray-500" x-show="!initialLog">Waiting for output...</span></div>
+                ><span class="text-gray-500" x-show="!initialLog && !isRunning">Waiting for output...</span><div x-show="!initialLog && isRunning" class="py-1" x-data="{
+                        phases: [
+                            { text: '  Cloning repository...', color: 'log-cyan', delay: 400 },
+                            { text: '  npm install running...', color: 'log-cyan', delay: 1200 },
+                            { text: '  Dependencies resolved.', color: 'log-green', delay: 2800 },
+                            { text: '', color: 'log-dim', delay: 3200 },
+                            { text: '  Starting Cypress...', color: 'log-cyan', delay: 3600 },
+                            { text: '  Browser: Electron 118 (headless)', color: 'log-dim', delay: 4400 },
+                            { text: '', color: 'log-dim', delay: 4800 },
+                            { text: '  Found spec files:', color: 'log-cyan', delay: 5200 },
+                        ],
+                        shown: [],
+                        spinnerFrame: 0,
+                        spinnerChars: ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'],
+                        specNames: ['account/account.spec.js','cart/cart.spec.js','checkout/checkout.spec.js','cms/cms-pages.spec.js','contact/contact.spec.js'],
+                        currentSpec: 0,
+                        specTimer: null,
+                        init() {
+                            this.phases.forEach(p => {
+                                setTimeout(() => { this.shown.push(p); this.$nextTick(() => { const c = this.$el.closest('#log-container'); if(c) c.scrollTop = c.scrollHeight; }); }, p.delay);
+                            });
+                            setInterval(() => { this.spinnerFrame = (this.spinnerFrame + 1) % 10; }, 80);
+                            this.specTimer = setInterval(() => { this.currentSpec = (this.currentSpec + 1) % this.specNames.length; }, 3500);
+                        }
+                    }">
+                    <template x-for="(p, i) in shown" :key="i">
+                        <div class="log-line" :class="p.color" x-text="p.text"></div>
+                    </template>
+                    <div x-show="shown.length >= 8" class="mt-2 space-y-1">
+                        <div class="log-dim">  ────────────────────────────────────────────</div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-yellow-400" x-text="spinnerChars[spinnerFrame]"></span>
+                            <span class="log-yellow">Running: </span><span class="log-dim font-mono" x-text="specNames[currentSpec]"></span>
+                        </div>
+                    </div>
+                </div></div>
             </div>
 
             {{-- Test Results --}}
@@ -135,9 +179,21 @@
                             @endforeach
                         </div>
                     @empty
-                        <div class="p-8 text-center text-gray-400 text-sm">
-                            <p x-show="isRunning">Tests are running, results will appear here...</p>
-                            <p x-show="!isRunning">No results recorded.</p>
+                        <div class="p-4">
+                            <div x-show="isRunning" style="border-top:1px solid rgba(255,255,255,0.06)">
+                                @php $skeletonWidths = [[75,35],[52,28],[83,42],[64,30],[58,25],[79,38],[48,32]]; @endphp
+                                @foreach($skeletonWidths as $idx => $widths)
+                                <div style="display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06)">
+                                    <div style="width:20px;height:20px;border-radius:9999px;background:#4b5563;flex-shrink:0;animation:skeletonPulse 1.4s ease-in-out {{ $idx * 100 }}ms infinite"></div>
+                                    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                                        <div style="width:{{ $widths[0] }}%;height:10px;border-radius:9999px;background:#4b5563;animation:skeletonPulse 1.4s ease-in-out {{ $idx * 100 + 50 }}ms infinite"></div>
+                                        <div style="width:{{ $widths[1] }}%;height:7px;border-radius:9999px;background:#374151;animation:skeletonPulse 1.4s ease-in-out {{ $idx * 100 + 80 }}ms infinite"></div>
+                                    </div>
+                                    <div style="width:44px;height:10px;border-radius:9999px;background:#4b5563;flex-shrink:0;animation:skeletonPulse 1.4s ease-in-out {{ $idx * 100 + 60 }}ms infinite"></div>
+                                </div>
+                                @endforeach
+                            </div>
+                            <p x-show="!isRunning" class="text-center text-gray-400 text-sm py-4">No results recorded.</p>
                         </div>
                     @endforelse
                 </div>

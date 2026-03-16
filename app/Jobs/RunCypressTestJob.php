@@ -207,8 +207,10 @@ class RunCypressTestJob implements ShouldQueue
 
         // Build cypress command — spec_override targets only failing specs from a previous run
         $specPattern = $this->run->spec_override ?? $suite->spec_pattern;
+        // Force mochawesome reporter via CLI so we don't depend on each client repo having it configured
+        $reporterFlags = '--reporter mochawesome --reporter-options "reportDir=mochawesome-report,overwrite=false,html=false,json=true"';
         // Merge stderr into stdout so we capture everything on one pipe
-        $cmd = 'cd ' . escapeshellarg($this->runPath) . " && {$envString} npx cypress run --spec " . escapeshellarg($specPattern) . ' 2>&1';
+        $cmd = 'cd ' . escapeshellarg($this->runPath) . " && {$envString} npx cypress run --spec " . escapeshellarg($specPattern) . " {$reporterFlags} 2>&1";
 
         $this->log("🧪 Running Cypress tests...");
         $this->log("   Spec pattern: {$specPattern}");
