@@ -404,6 +404,8 @@ command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=1 --timeout=14400
 directory=${APP_DIR}
 user=${APP_USER}
 umask=002
+numprocs=3
+process_name=%(program_name)s_%(process_num)02d
 autostart=true
 autorestart=true
 stopasgroup=true
