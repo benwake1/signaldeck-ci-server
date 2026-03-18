@@ -148,6 +148,18 @@ else
     skip "Google Chrome already installed"
 fi
 
+info "Creating Chrome wrapper with server-optimised flags..."
+cat > /usr/local/bin/chrome-cypress <<'EOF'
+#!/usr/bin/env bash
+# Wrapper used by Cypress — adds flags suited for headless Linux servers.
+exec /usr/bin/google-chrome-stable \
+    --disable-gpu \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    "$@"
+EOF
+chmod +x /usr/local/bin/chrome-cypress
+
 success "Cypress headless dependencies installed."
 
 # -----------------------------------------------------------------------------

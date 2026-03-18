@@ -225,7 +225,7 @@ class RunCypressTestJob implements ShouldQueue
         $browser = $this->resolveChromiumBinary();
         $browserFlag = $browser ? '--browser ' . escapeshellarg($browser) : '';
         // Reduce memory pressure to prevent renderer crashes on memory-intensive apps
-        $configFlags = '--config experimentalMemoryManagement=true,numTestsKeptInMemory=0';
+        $configFlags = '--config experimentalMemoryManagement=true,numTestsKeptInMemory=0,videoCompression=51';
         // Merge stderr into stdout so we capture everything on one pipe
         $cmd = 'cd ' . escapeshellarg($this->runPath) . " && {$envString} npx cypress run --spec " . escapeshellarg($specPattern) . " {$reporterFlags} {$configFlags} {$browserFlag} 2>&1";
 
@@ -296,9 +296,13 @@ class RunCypressTestJob implements ShouldQueue
 
     private function resolveChromiumBinary(): ?string
     {
-        exec('which google-chrome-stable 2>/dev/null', $out, $code);
-        $path = trim($out[0] ?? '');
-        return ($code === 0 && $path !== '') ? $path : null;
+        // Prefer the wrapper script which adds server-optimised Chrome flags
+        foreach (['/usr/local/bin/chrome-cypress', '/usr/bin/google-chrome-stable'] as $path) {
+            if (file_exists($path) && is_executable($path)) {
+                return $path;
+            }
+        }
+        return null;
     }
 
     private function mergeMochawesomeReports(): string
