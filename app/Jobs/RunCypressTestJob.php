@@ -18,6 +18,7 @@ class RunCypressTestJob implements ShouldQueue
 {
     use Queueable, InteractsWithQueue, SerializesModels;
 
+    public string $queue = 'cypress';
     public int $timeout;
     public int $tries = 1;
 

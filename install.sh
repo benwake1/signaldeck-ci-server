@@ -424,7 +424,7 @@ header "Step 9 — Supervisor"
 info "Writing Supervisor config..."
 cat > /etc/supervisor/conf.d/cypress-dashboard.conf <<SUPERVISOR
 [program:cypress-queue]
-command=php ${APP_DIR}/artisan queue:work --sleep=3 --tries=1 --timeout=14400
+command=php ${APP_DIR}/artisan queue:work --queue=cypress --sleep=3 --tries=1 --timeout=14400
 directory=${APP_DIR}
 user=${APP_USER}
 umask=002
@@ -436,6 +436,19 @@ stopasgroup=true
 killasgroup=true
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/cypress-queue.log
+
+[program:cypress-notifications]
+command=php ${APP_DIR}/artisan queue:work --queue=default --sleep=3 --tries=3 --timeout=60
+directory=${APP_DIR}
+user=${APP_USER}
+umask=002
+numprocs=1
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/cypress-notifications.log
 
 [program:cypress-reverb]
 command=php ${APP_DIR}/artisan reverb:start --host=127.0.0.1 --port=8080
