@@ -18,7 +18,6 @@ class RunCypressTestJob implements ShouldQueue
 {
     use Queueable, InteractsWithQueue, SerializesModels;
 
-    public $queue = 'cypress';
     public int $timeout;
     public int $tries = 1;
 
@@ -28,6 +27,7 @@ class RunCypressTestJob implements ShouldQueue
     public function __construct(
         public readonly TestRun $run
     ) {
+        $this->onQueue('cypress');
         $this->timeout = (int) config('cypress.job_timeout', 10800); // default 3 hours
         $this->runPath = sys_get_temp_dir() . "/cypress-runs/{$run->id}";
     }
