@@ -92,14 +92,17 @@ class AdminPanelProvider extends PanelProvider
                     // TODO: restrict to a specific email domain, e.g.:
                     // ->domainAllowList(['yourdomain.com'])
                     ->createUserUsing(function (string $provider, \Laravel\Socialite\Contracts\User $oauthUser, FilamentSocialitePlugin $plugin) {
-                        // Find existing user by email, or create a new one via Google SSO.
-                        return \App\Models\User::firstOrCreate(
+                        $user = \App\Models\User::firstOrCreate(
                             ['email' => $oauthUser->getEmail()],
                             [
-                                'name'     => $oauthUser->getName(),
-                                'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                                'name'       => $oauthUser->getName(),
+                                'avatar_url' => $oauthUser->getAvatar(),
+                                'password'   => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
                             ],
                         );
+                        // Refresh avatar on every login — Google URLs can rotate
+                        $user->update(['avatar_url' => $oauthUser->getAvatar()]);
+                        return $user;
                     }),
             ]);
     }
