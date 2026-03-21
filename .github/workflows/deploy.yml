@@ -37,10 +37,14 @@ jobs:
                 continue
               fi
 
+              # Detect the owner so git/composer/artisan run as the correct user
+              APP_USER=$(stat -c '%U' "$APP_DIR")
+              git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
               cd "$APP_DIR"
-              git fetch --tags origin
-              git reset --hard origin/main
-              APP_VERSION="$VERSION" bash deploy.sh
+              sudo -u "$APP_USER" git fetch --tags origin
+              sudo -u "$APP_USER" git reset --hard origin/main
+              APP_VERSION="$VERSION" sudo -u "$APP_USER" bash deploy.sh
 
               echo "✔ Done: $APP_DIR"
             done
