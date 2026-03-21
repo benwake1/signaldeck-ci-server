@@ -32,6 +32,22 @@ class SsoConfigService
     }
 
     /**
+     * Check if SSO settings have ever been saved via the admin UI.
+     * When false, the .env fallback is used for backwards compatibility.
+     * Once any provider toggle has been explicitly set, DB takes over.
+     */
+    public function hasDbSettings(): bool
+    {
+        foreach (array_keys(self::PROVIDERS) as $provider) {
+            if (AppSetting::get("sso_{$provider}_enabled") !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Get decrypted client ID for a provider.
      */
     public function getClientId(string $provider): string

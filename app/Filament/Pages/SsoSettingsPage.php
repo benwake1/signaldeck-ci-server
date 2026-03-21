@@ -33,16 +33,26 @@ class SsoSettingsPage extends Page
     {
         $sso = app(SsoConfigService::class);
 
+        // If the admin has never configured SSO via the UI, pre-fill from .env
+        // so the toggle reflects what's actually running on the login page.
+        $envFallback = ! $sso->hasDbSettings();
+
         $this->form->fill([
             // ── Google ──
-            'sso_google_enabled'       => $sso->isProviderEnabled('google'),
-            'sso_google_client_id'     => $sso->getClientId('google'),
-            'sso_google_client_secret' => $this->maskSecret('sso_google_client_secret'),
+            'sso_google_enabled'       => $envFallback
+                ? (config('services.google.client_id') && config('services.google.client_secret'))
+                : $sso->isProviderEnabled('google'),
+            'sso_google_client_id'     => $sso->getClientId('google') ?: config('services.google.client_id', ''),
+            'sso_google_client_secret' => $this->maskSecret('sso_google_client_secret')
+                ?: ($envFallback && config('services.google.client_secret') ? self::SECRET_PLACEHOLDER : ''),
 
             // ── GitHub ──
-            'sso_github_enabled'       => $sso->isProviderEnabled('github'),
-            'sso_github_client_id'     => $sso->getClientId('github'),
-            'sso_github_client_secret' => $this->maskSecret('sso_github_client_secret'),
+            'sso_github_enabled'       => $envFallback
+                ? (config('services.github.client_id') && config('services.github.client_secret'))
+                : $sso->isProviderEnabled('github'),
+            'sso_github_client_id'     => $sso->getClientId('github') ?: config('services.github.client_id', ''),
+            'sso_github_client_secret' => $this->maskSecret('sso_github_client_secret')
+                ?: ($envFallback && config('services.github.client_secret') ? self::SECRET_PLACEHOLDER : ''),
         ]);
     }
 
@@ -128,11 +138,26 @@ class SsoSettingsPage extends Page
     {
         $data = $this->form->getState();
         $sso = app(SsoConfigService::class);
+        $wasFallback = ! $sso->hasDbSettings();
 
         foreach (array_keys(SsoConfigService::PROVIDERS) as $provider) {
             AppSetting::set("sso_{$provider}_enabled", ($data["sso_{$provider}_enabled"] ?? false) ? '1' : '0');
             $sso->setCredential("sso_{$provider}_client_id", $data["sso_{$provider}_client_id"] ?? '');
-            $this->saveSecretIfChanged("sso_{$provider}_client_secret", $data["sso_{$provider}_client_secret"] ?? '');
+
+            $secret = $data["sso_{$provider}_client_secret"] ?? '';
+
+            // First save with .env fallback active: the placeholder represents
+            // an .env value, not a DB value. Copy the .env secret into the DB
+            // so credentials are preserved when the fallback stops being used.
+            if ($wasFallback && $secret === self::SECRET_PLACEHOLDER) {
+                $envSecret = config("services.{$provider}.client_secret", '');
+                if ($envSecret !== '') {
+                    $this->saveSecretIfChanged("sso_{$provider}_client_secret", $envSecret);
+                    continue;
+                }
+            }
+
+            $this->saveSecretIfChanged("sso_{$provider}_client_secret", $secret);
         }
 
         $sso->applyRuntimeConfig();

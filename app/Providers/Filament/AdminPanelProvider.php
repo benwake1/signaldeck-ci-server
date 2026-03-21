@@ -103,16 +103,23 @@ class AdminPanelProvider extends PanelProvider
     {
         try {
             $sso = app(SsoConfigService::class);
-            $activeProviders = $sso->getActiveProviders();
         } catch (\Throwable) {
             // DB not available (migrations, first install) — fall back to .env config
             return $this->buildEnvFallbackPlugin();
         }
 
-        if (empty($activeProviders)) {
-            // No DB-configured providers — check if .env has Google credentials
-            // so existing installs keep working until admin configures via UI
+        // If the admin has never visited SSO settings, no DB rows exist yet.
+        // Fall back to .env so existing installs keep working until configured via UI.
+        if (! $sso->hasDbSettings()) {
             return $this->buildEnvFallbackPlugin();
+        }
+
+        // DB settings exist — admin has explicitly configured SSO.
+        // Only show providers they've enabled. If all are off, show nothing.
+        $activeProviders = $sso->getActiveProviders();
+
+        if (empty($activeProviders)) {
+            return null;
         }
 
         $providers = [];
