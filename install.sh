@@ -191,6 +191,23 @@ else
     success "User '${APP_USER}' created."
 fi
 
+# ── Deploy user ──
+if ! id "deployer" &>/dev/null; then
+    info "Creating 'deployer' system user for CI/CD..."
+    useradd -m -s /bin/bash deployer
+    success "User 'deployer' created."
+else
+    skip "User 'deployer' already exists"
+fi
+
+SUDOERS_FILE="/etc/sudoers.d/deployer-${APP_USER}"
+info "Writing scoped sudoers rule (deployer → ${APP_USER})..."
+cat > "${SUDOERS_FILE}" <<SUDOERS
+deployer ALL=(${APP_USER}) NOPASSWD: /usr/bin/git, /usr/bin/bash ${APP_DIR}/deploy.sh
+SUDOERS
+chmod 440 "${SUDOERS_FILE}"
+success "Sudoers rule: deployer can run git + deploy.sh as '${APP_USER}'"
+
 # -----------------------------------------------------------------------------
 # Step 5 — Clone and install
 # -----------------------------------------------------------------------------
