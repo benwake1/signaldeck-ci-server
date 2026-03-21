@@ -75,11 +75,14 @@ else
 fi
 
 # Required PHP extensions
-REQUIRED_EXTS="mysql mbstring xml curl zip bcmath intl"
+REQUIRED_EXTS="pdo_mysql mbstring xml curl zip bcmath intl"
 MISSING_EXTS=0
 for ext in $REQUIRED_EXTS; do
     if ! php -m 2>/dev/null | grep -qi "^${ext}$"; then
-        echo -e "${RED}✖ PHP extension '${ext}' missing — install php8.4-${ext}${NC}"
+        # pdo_mysql is provided by php8.4-mysql, not php8.4-pdo_mysql
+        local pkg="php8.4-${ext}"
+        [[ "$ext" == "pdo_mysql" ]] && pkg="php8.4-mysql"
+        echo -e "${RED}✖ PHP extension '${ext}' missing — install ${pkg}${NC}"
         ERRORS=$((ERRORS + 1))
         MISSING_EXTS=$((MISSING_EXTS + 1))
     fi
@@ -96,11 +99,11 @@ else
     ERRORS=$((ERRORS + 1))
 fi
 
-# MySQL
+# MySQL CLI client (needed to create the database)
 if command -v mysql &>/dev/null; then
-    success "MySQL client available"
+    success "MySQL CLI client available"
 else
-    echo -e "${RED}✖ MySQL client not found${NC}"
+    echo -e "${RED}✖ MySQL CLI client not found — install mysql-client${NC}"
     ERRORS=$((ERRORS + 1))
 fi
 
