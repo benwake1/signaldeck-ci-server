@@ -21,7 +21,26 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           script: |
-            cd /var/www/cypress-dashboard
-            git fetch --tags origin
-            git reset --hard origin/main
-            APP_VERSION="${{ github.ref_type == 'tag' && github.ref_name || '' }}" bash deploy.sh
+            # Deploy to all instances listed in DEPLOY_PATHS (space-separated).
+            # Falls back to the default path for single-instance setups.
+            PATHS="${{ secrets.DEPLOY_PATHS || '/var/www/cypress-dashboard' }}"
+            VERSION="${{ github.ref_type == 'tag' && github.ref_name || '' }}"
+
+            for APP_DIR in $PATHS; do
+              echo ""
+              echo "══════════════════════════════════════"
+              echo " Deploying: $APP_DIR"
+              echo "══════════════════════════════════════"
+
+              if [ ! -d "$APP_DIR" ]; then
+                echo "⚠ Directory not found — skipping: $APP_DIR"
+                continue
+              fi
+
+              cd "$APP_DIR"
+              git fetch --tags origin
+              git reset --hard origin/main
+              APP_VERSION="$VERSION" bash deploy.sh
+
+              echo "✔ Done: $APP_DIR"
+            done

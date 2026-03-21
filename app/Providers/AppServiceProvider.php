@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Events\TestRunStatusChanged;
 use App\Listeners\SendTestRunCompletedEmail;
 use App\Models\AppSetting;
+use App\Services\SsoConfigService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -13,7 +14,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(SsoConfigService::class);
     }
 
     public function boot(): void
@@ -21,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(TestRunStatusChanged::class, SendTestRunCompletedEmail::class);
 
         $this->applyMailSettings();
+        $this->applySsoSettings();
     }
 
     private function applyMailSettings(): void
@@ -43,6 +45,15 @@ class AppServiceProvider extends ServiceProvider
                     Config::set($configKey, $value);
                 }
             }
+        } catch (\Throwable) {
+            // DB not available (e.g. during migrations or first install)
+        }
+    }
+
+    private function applySsoSettings(): void
+    {
+        try {
+            app(SsoConfigService::class)->applyRuntimeConfig();
         } catch (\Throwable) {
             // DB not available (e.g. during migrations or first install)
         }

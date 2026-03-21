@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\AppSetting;
+use Illuminate\Support\Facades\Crypt;
+
+class SsoConfigService
+{
+    /**
+     * Supported SSO providers and their display metadata.
+     */
+    public const PROVIDERS = [
+        'google' => [
+            'label' => 'Google',
+            'color' => '#4285F4',
+            'redirect_path' => '/admin/oauth/callback/google',
+        ],
+        'github' => [
+            'label' => 'GitHub',
+            'color' => '#24292F',
+            'redirect_path' => '/admin/oauth/callback/github',
+        ],
+    ];
+
+    /**
+     * Check if a specific SSO provider is enabled.
+     */
+    public function isProviderEnabled(string $provider): bool
+    {
+        return AppSetting::get("sso_{$provider}_enabled", '0') === '1';
+    }
+
+    /**
+     * Get decrypted client ID for a provider.
+     */
+    public function getClientId(string $provider): string
+    {
+        return $this->decryptSetting("sso_{$provider}_client_id");
+    }
+
+    /**
+     * Get decrypted client secret for a provider.
+     */
+    public function getClientSecret(string $provider): string
+    {
+        return $this->decryptSetting("sso_{$provider}_client_secret");
+    }
+
+    /**
+     * Get the redirect URI for a provider.
+     */
+    public function getRedirectUri(string $provider): string
+    {
+        $meta = self::PROVIDERS[$provider] ?? null;
+
+        return $meta
+            ? url($meta['redirect_path'])
+            : '';
+    }
+
+    /**
+     * Check whether a provider has all required credentials configured.
+     */
+    public function isProviderConfigured(string $provider): bool
+    {
+        return $this->getClientId($provider) !== ''
+            && $this->getClientSecret($provider) !== '';
+    }
+
+    /**
+     * Get the list of providers that are both enabled and configured.
+     */
+    public function getActiveProviders(): array
+    {
+        $active = [];
+
+        foreach (array_keys(self::PROVIDERS) as $provider) {
+            if ($this->isProviderEnabled($provider) && $this->isProviderConfigured($provider)) {
+                $active[] = $provider;
+            }
+        }
+
+        return $active;
+    }
+
+    /**
+     * Save an encrypted credential for a provider.
+     */
+    public function setCredential(string $key, string $value): void
+    {
+        AppSetting::set($key, $value !== '' ? Crypt::encryptString($value) : '');
+    }
+
+    /**
+     * Apply active SSO provider configs into Laravel's services config at runtime.
+     * This allows Socialite to read credentials from the database instead of .env.
+     */
+    public function applyRuntimeConfig(): void
+    {
+        foreach ($this->getActiveProviders() as $provider) {
+            config([
+                "services.{$provider}.client_id"     => $this->getClientId($provider),
+                "services.{$provider}.client_secret"  => $this->getClientSecret($provider),
+                "services.{$provider}.redirect"        => $this->getRedirectUri($provider),
+            ]);
+        }
+    }
+
+    /**
+     * Decrypt a stored setting, gracefully handling unencrypted legacy values.
+     */
+    private function decryptSetting(string $key): string
+    {
+        $stored = AppSetting::get($key, '');
+
+        if (! $stored) {
+            return '';
+        }
+
+        try {
+            return Crypt::decryptString($stored);
+        } catch (\Exception) {
+            // Value stored before encryption was added — return as-is
+            return $stored;
+        }
+    }
+}

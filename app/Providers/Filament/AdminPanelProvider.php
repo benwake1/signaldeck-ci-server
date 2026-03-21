@@ -8,6 +8,7 @@ use App\Filament\Resources\TestRunResource;
 use App\Filament\Widgets\ProjectHealthWidget;
 use App\Filament\Widgets\RecentRunsWidget;
 use App\Filament\Widgets\StatsOverviewWidget;
+use App\Services\SsoConfigService;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Http\Middleware\Authenticate;
@@ -31,7 +32,7 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        $panel = $panel
             ->default()
             ->id('admin')
             ->path('admin')
@@ -58,6 +59,9 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-o-beaker'),
                 NavigationGroup::make('Management')
                     ->icon('heroicon-o-building-office'),
+                NavigationGroup::make('Settings')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsed(),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
@@ -79,31 +83,102 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            ->authMiddleware([Authenticate::class])
-            ->plugins([
-                FilamentSocialitePlugin::make()
-                    ->providers([
-                        Provider::make('google')
-                            ->label('Google')
-                            ->color(\Filament\Support\Colors\Color::hex('#4285F4'))
-                            ->outlined(true),
-                    ])
-                    ->registration(true)
-                    // TODO: restrict to a specific email domain, e.g.:
-                    // ->domainAllowList(['yourdomain.com'])
-                    ->createUserUsing(function (string $provider, \Laravel\Socialite\Contracts\User $oauthUser, FilamentSocialitePlugin $plugin) {
-                        $user = \App\Models\User::firstOrCreate(
-                            ['email' => $oauthUser->getEmail()],
-                            [
-                                'name'       => $oauthUser->getName(),
-                                'avatar_url' => $oauthUser->getAvatar(),
-                                'password'   => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
-                            ],
-                        );
-                        // Refresh avatar on every login — Google URLs can rotate
-                        $user->update(['avatar_url' => $oauthUser->getAvatar()]);
-                        return $user;
-                    }),
-            ]);
+            ->authMiddleware([Authenticate::class]);
+
+        // ── SSO Providers (admin-controllable) ───────────────────────────
+        $ssoPlugin = $this->buildSsoPlugin();
+
+        if ($ssoPlugin) {
+            $panel->plugins([$ssoPlugin]);
+        }
+
+        return $panel;
+    }
+
+    /**
+     * Build the FilamentSocialitePlugin with only the admin-enabled providers.
+     * Returns null if no providers are active (hides SSO buttons entirely).
+     */
+    private function buildSsoPlugin(): ?FilamentSocialitePlugin
+    {
+        try {
+            $sso = app(SsoConfigService::class);
+            $activeProviders = $sso->getActiveProviders();
+        } catch (\Throwable) {
+            // DB not available (migrations, first install) — fall back to .env config
+            return $this->buildEnvFallbackPlugin();
+        }
+
+        if (empty($activeProviders)) {
+            // No DB-configured providers — check if .env has Google credentials
+            // so existing installs keep working until admin configures via UI
+            return $this->buildEnvFallbackPlugin();
+        }
+
+        $providers = [];
+
+        foreach ($activeProviders as $providerName) {
+            $meta = SsoConfigService::PROVIDERS[$providerName] ?? null;
+            if (! $meta) continue;
+
+            $providers[] = Provider::make($providerName)
+                ->label($meta['label'])
+                ->color(Color::hex($meta['color']))
+                ->outlined(true);
+        }
+
+        if (empty($providers)) {
+            return null;
+        }
+
+        return FilamentSocialitePlugin::make()
+            ->providers($providers)
+            ->registration(true)
+            ->createUserUsing(function (string $provider, \Laravel\Socialite\Contracts\User $oauthUser, FilamentSocialitePlugin $plugin) {
+                $user = \App\Models\User::firstOrCreate(
+                    ['email' => $oauthUser->getEmail()],
+                    [
+                        'name'       => $oauthUser->getName(),
+                        'avatar_url' => $oauthUser->getAvatar(),
+                        'password'   => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                    ],
+                );
+                // Refresh avatar on every login — provider URLs can rotate
+                $user->update(['avatar_url' => $oauthUser->getAvatar()]);
+                return $user;
+            });
+    }
+
+    /**
+     * Backwards-compatible fallback: use .env credentials if no DB settings exist yet.
+     * This keeps Google SSO working for existing installs before the admin
+     * has visited the new Settings page.
+     */
+    private function buildEnvFallbackPlugin(): ?FilamentSocialitePlugin
+    {
+        if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
+            return null;
+        }
+
+        return FilamentSocialitePlugin::make()
+            ->providers([
+                Provider::make('google')
+                    ->label('Google')
+                    ->color(Color::hex('#4285F4'))
+                    ->outlined(true),
+            ])
+            ->registration(true)
+            ->createUserUsing(function (string $provider, \Laravel\Socialite\Contracts\User $oauthUser, FilamentSocialitePlugin $plugin) {
+                $user = \App\Models\User::firstOrCreate(
+                    ['email' => $oauthUser->getEmail()],
+                    [
+                        'name'       => $oauthUser->getName(),
+                        'avatar_url' => $oauthUser->getAvatar(),
+                        'password'   => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                    ],
+                );
+                $user->update(['avatar_url' => $oauthUser->getAvatar()]);
+                return $user;
+            });
     }
 }

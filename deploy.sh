@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================
-#  Cypress Dashboard — DeployHQ post-deployment script
+#  Cypress Dashboard — Post-deployment script
 #  Runs on the server after each successful push to main.
+#  Works from any install directory — resolves its own location.
 # =============================================================
 set -e
 
-APP_DIR="/var/www/cypress-dashboard"
+# Resolve the directory this script lives in (works for any instance)
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PHP="php8.4"
 
 cd "${APP_DIR}"

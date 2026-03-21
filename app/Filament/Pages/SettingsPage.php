@@ -7,17 +7,16 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Mail;
 
 class SettingsPage extends Page
 {
     protected static ?string $navigationIcon = null;
-    protected static ?string $navigationLabel = 'Settings';
-    protected static ?string $navigationGroup = 'Management';
-    protected static ?int $navigationSort = 99;
+    protected static ?string $navigationLabel = 'General';
+    protected static ?string $navigationGroup = 'Settings';
+    protected static ?int $navigationSort = 1;
     protected static string $view = 'filament.pages.settings';
+    protected static ?string $title = 'General Settings';
+    protected static ?string $slug = 'settings';
 
     public ?array $data = [];
 
@@ -29,15 +28,7 @@ class SettingsPage extends Page
     public function mount(): void
     {
         $this->form->fill([
-            'notifications_enabled'  => AppSetting::get('notifications_enabled', '1') === '1',
-            'mail_from_address'      => AppSetting::get('mail_from_address', config('mail.from.address')),
-            'mail_from_name'         => AppSetting::get('mail_from_name', config('mail.from.name')),
-            'mail_mailer'            => AppSetting::get('mail_mailer', config('mail.default')),
-            'mail_host'              => AppSetting::get('mail_host', config('mail.mailers.smtp.host')),
-            'mail_port'              => AppSetting::get('mail_port', config('mail.mailers.smtp.port')),
-            'mail_username'          => AppSetting::get('mail_username', config('mail.mailers.smtp.username')),
-            'mail_password'          => $this->getMailPassword(),
-            'mail_encryption'        => AppSetting::get('mail_encryption', config('mail.mailers.smtp.encryption')),
+            'notifications_enabled' => AppSetting::get('notifications_enabled', '1') === '1',
         ]);
     }
 
@@ -46,101 +37,15 @@ class SettingsPage extends Page
         return $form
             ->schema([
                 Forms\Components\Section::make('Notifications')
+                    ->icon('heroicon-o-bell')
                     ->schema([
                         Forms\Components\Toggle::make('notifications_enabled')
                             ->label('Send email notifications when a test run completes')
                             ->helperText('Emails are sent to the user who triggered the test run.')
                             ->default(true),
                     ]),
-
-                Forms\Components\Section::make('Mail Configuration')
-                    ->description('Overrides values from .env. Leave blank to use .env defaults.')
-                    ->schema([
-                        Forms\Components\Select::make('mail_mailer')
-                            ->label('Mail Driver')
-                            ->options([
-                                'smtp'     => 'SMTP',
-                                'sendgrid' => 'SendGrid',
-                                'mailgun'  => 'Mailgun',
-                                'ses'      => 'Amazon SES',
-                                'log'      => 'Log (testing)',
-                            ])
-                            ->default('smtp'),
-
-                        Forms\Components\TextInput::make('mail_from_address')
-                            ->label('From Address')
-                            ->email(),
-
-                        Forms\Components\TextInput::make('mail_from_name')
-                            ->label('From Name'),
-
-                        Forms\Components\TextInput::make('mail_host')
-                            ->label('SMTP Host')
-                            ->placeholder('smtp.example.com'),
-
-                        Forms\Components\TextInput::make('mail_port')
-                            ->label('SMTP Port')
-                            ->numeric()
-                            ->placeholder('587'),
-
-                        Forms\Components\TextInput::make('mail_username')
-                            ->label('SMTP Username'),
-
-                        Forms\Components\TextInput::make('mail_password')
-                            ->label('SMTP Password / API Key')
-                            ->password()
-                            ->revealable()
-                            ->placeholder('Enter password or API key'),
-
-                        Forms\Components\TextInput::make('mail_encryption')
-                            ->label('Encryption')
-                            ->placeholder('tls'),
-                    ])->columns(2),
             ])
             ->statePath('data');
-    }
-
-    public function sendTestEmail(): void
-    {
-        // Save current form state first so we're testing what's on screen
-        $this->save();
-
-        $user = auth()->user();
-        if (! $user?->email) {
-            Notification::make()
-                ->title('No email address found for your account')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        // Apply the freshly-saved settings and flush the cached mail transport
-        // so the new config is used rather than the one resolved at request boot
-        $this->applyMailSettings();
-        Mail::purge(config('mail.default'));
-
-        try {
-            Mail::raw(
-                'This is a test email from your Cypress Dashboard to confirm mail settings are working correctly.',
-                function ($message) use ($user) {
-                    $message->to($user->email)
-                            ->subject('Cypress Dashboard — Mail Configuration Test');
-                }
-            );
-
-            Notification::make()
-                ->title('Test email sent')
-                ->body("Delivered to {$user->email}. Check your inbox.")
-                ->success()
-                ->send();
-        } catch (\Throwable $e) {
-            Notification::make()
-                ->title('Failed to send test email')
-                ->body($e->getMessage())
-                ->danger()
-                ->persistent()
-                ->send();
-        }
     }
 
     public function save(): void
@@ -148,62 +53,10 @@ class SettingsPage extends Page
         $data = $this->form->getState();
 
         AppSetting::set('notifications_enabled', $data['notifications_enabled'] ? '1' : '0');
-        AppSetting::set('mail_from_address', $data['mail_from_address'] ?? '');
-        AppSetting::set('mail_from_name', $data['mail_from_name'] ?? '');
-        AppSetting::set('mail_mailer', $data['mail_mailer'] ?? '');
-        AppSetting::set('mail_host', $data['mail_host'] ?? '');
-        AppSetting::set('mail_port', $data['mail_port'] ?? '');
-        AppSetting::set('mail_username', $data['mail_username'] ?? '');
-        $this->setMailPassword($data['mail_password'] ?? '');
-        AppSetting::set('mail_encryption', $data['mail_encryption'] ?? '');
 
         Notification::make()
             ->title('Settings saved')
             ->success()
             ->send();
-    }
-
-    private function applyMailSettings(): void
-    {
-        $map = [
-            'mail_mailer'       => 'mail.default',
-            'mail_from_address' => 'mail.from.address',
-            'mail_from_name'    => 'mail.from.name',
-            'mail_host'         => 'mail.mailers.smtp.host',
-            'mail_port'         => 'mail.mailers.smtp.port',
-            'mail_username'     => 'mail.mailers.smtp.username',
-            'mail_password'     => 'mail.mailers.smtp.password',
-            'mail_encryption'   => 'mail.mailers.smtp.encryption',
-        ];
-
-        foreach ($map as $setting => $configKey) {
-            $value = $setting === 'mail_password'
-                ? $this->getMailPassword()
-                : AppSetting::get($setting);
-
-            if ($value !== null && $value !== '') {
-                Config::set($configKey, $value);
-            }
-        }
-    }
-
-    // ── Helpers: encrypted SMTP credential storage ───────────────────────────
-
-    private function getMailPassword(): string
-    {
-        $stored = AppSetting::get('mail_password', '');
-        if (!$stored) return '';
-        try {
-            return Crypt::decryptString($stored);
-        } catch (\Exception) {
-            // Value was stored unencrypted before this change — return as-is
-            // and it will be re-encrypted on next save.
-            return $stored;
-        }
-    }
-
-    private function setMailPassword(string $value): void
-    {
-        AppSetting::set('mail_password', $value !== '' ? Crypt::encryptString($value) : '');
     }
 }
