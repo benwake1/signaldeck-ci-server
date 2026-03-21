@@ -29,7 +29,10 @@ class RunCypressTestJob implements ShouldQueue
     ) {
         $this->onQueue('cypress');
         $this->timeout = (int) config('cypress.job_timeout', 10800); // default 3 hours
-        $this->runPath = sys_get_temp_dir() . "/cypress-runs/{$run->id}";
+        // Include a slug derived from the app directory to avoid collisions
+        // when multiple instances share the same server and /tmp.
+        $instanceSlug = md5(base_path());
+        $this->runPath = sys_get_temp_dir() . "/cypress-runs-{$instanceSlug}/{$run->id}";
     }
 
     public function handle(
