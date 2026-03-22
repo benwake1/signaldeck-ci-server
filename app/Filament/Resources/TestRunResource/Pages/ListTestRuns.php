@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\TestRunResource\Pages;
 
 use App\Filament\Resources\TestRunResource;
-use App\Jobs\RunCypressTestJob;
 use App\Models\TestRun;
 use App\Models\TestSuite;
 use Filament\Forms;
@@ -56,15 +55,17 @@ class ListTestRuns extends ListRecords
                         ->required(),
                 ])
                 ->action(function (array $data) {
+                    $project = \App\Models\Project::find($data['project_id']);
                     $run = TestRun::create([
                         'project_id'    => $data['project_id'],
                         'test_suite_id' => $data['test_suite_id'],
+                        'runner_type'   => $project->runner_type,
                         'triggered_by'  => auth()->id(),
                         'status'        => TestRun::STATUS_PENDING,
                         'branch'        => $data['branch'],
                     ]);
 
-                    RunCypressTestJob::dispatch($run);
+                    $run->dispatchJob();
 
                     Notification::make()
                         ->title('Test run queued!')

@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\RunnerType;
+use App\Jobs\RunCypressTestJob;
+use App\Jobs\RunPlaywrightTestJob;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +14,7 @@ class TestRun extends Model
     protected $fillable = [
         'project_id',
         'test_suite_id',
+        'runner_type',
         'triggered_by',
         'status',
         'branch',
@@ -31,6 +35,7 @@ class TestRun extends Model
     ];
 
     protected $casts = [
+        'runner_type' => RunnerType::class,
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'total_tests' => 'integer',
@@ -114,6 +119,14 @@ class TestRun extends Model
     public function isComplete(): bool
     {
         return in_array($this->status, ['passing', 'failed', 'error', 'cancelled']);
+    }
+
+    public function dispatchJob(): void
+    {
+        match ($this->runner_type) {
+            RunnerType::Playwright => RunPlaywrightTestJob::dispatch($this),
+            default => RunCypressTestJob::dispatch($this),
+        };
     }
 
     public function isRunning(): bool

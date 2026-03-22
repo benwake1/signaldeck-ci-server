@@ -25,13 +25,16 @@ class MochawesomeParserService
         // partial results — the run stays in its previous state and can be retried.
         DB::transaction(function () use ($run, $data) {
             $stats = $data['stats'] ?? [];
+            $totalTests = $stats['tests'] ?? 0;
+            $failures = $stats['failures'] ?? 0;
             $run->update([
-                'total_tests'   => $stats['tests']    ?? 0,
+                'total_tests'   => $totalTests,
                 'passed_tests'  => $stats['passes']   ?? 0,
-                'failed_tests'  => $stats['failures'] ?? 0,
+                'failed_tests'  => $failures,
                 'pending_tests' => $stats['pending']  ?? 0,
                 'duration_ms'   => $stats['duration'] ?? null,
-                'status'        => ($stats['failures'] ?? 0) > 0 ? TestRun::STATUS_FAILED : TestRun::STATUS_PASSING,
+                'status'        => $totalTests === 0 ? TestRun::STATUS_ERROR : ($failures > 0 ? TestRun::STATUS_FAILED : TestRun::STATUS_PASSING),
+                'error_message' => $totalTests === 0 ? 'No tests were found or executed.' : null,
                 'finished_at'   => now(),
             ]);
 

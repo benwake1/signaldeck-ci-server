@@ -1,2 +1,1 @@
-queue: php artisan queue:work --timeout=3600
-reverb: php artisan reverb:start
+queue: php artisan queue:work --queue=cypress --timeout=3600

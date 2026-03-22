@@ -21,6 +21,9 @@ class TestSuite extends Model
         'spec_pattern',
         'branch_override',
         'env_variables',
+        'playwright_projects',
+        'playwright_workers',
+        'playwright_retries',
         'timeout_minutes',
         'active',
     ];
@@ -28,6 +31,9 @@ class TestSuite extends Model
     protected $casts = [
         'active' => 'boolean',
         'timeout_minutes' => 'integer',
+        'playwright_projects' => 'array',
+        'playwright_workers' => 'integer',
+        'playwright_retries' => 'integer',
     ];
 
     protected static function booted(): void

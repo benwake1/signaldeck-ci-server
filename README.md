@@ -1,6 +1,6 @@
-# Cypress Dashboard
+# Test Dashboard
 
-A self-hosted Cypress testing dashboard built with **Laravel 11** and **Filament v3**. Trigger Cypress test suites from a web UI, watch live output stream in real time, generate branded per-client HTML reports, and deliver expiring shareable links to clients — no third-party testing service required.
+A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 11** and **Filament v3**. Trigger test suites from a web UI, watch live output stream in real time, generate branded per-client HTML reports, and deliver expiring shareable links to clients — no third-party testing service required.
 
 ---
 
@@ -32,12 +32,15 @@ A self-hosted Cypress testing dashboard built with **Laravel 11** and **Filament
 
 ## Features
 
+- **Dual runner support** — Cypress and Playwright, configured per-project
 - **Multi-client branding** — per-client logo, colours, and footer text on all reports
 - **Multi-project** — each project maps to a separate Git repository with its own deploy key
 - **Test suites** — define spec patterns, branch overrides, and env vars per suite
-- **One-click test runs** — trigger Cypress from the admin UI, no CI pipeline required
-- **Live log streaming** — watch Cypress output line by line via WebSocket (Laravel Reverb)
-- **Mochawesome parsing** — automatically merges and parses JSON test reports into the database
+- **One-click test runs** — trigger tests from the admin UI, no CI pipeline required
+- **Live console output** — watch test output update in real time via Livewire polling
+- **Result parsing** — Mochawesome (Cypress) and Playwright JSON reports parsed into the database
+- **Playwright project discovery** — auto-detect available browsers/devices from `playwright.config.ts`
+- **Performance tuning** — admin-only parallel workers and retry overrides for Playwright suites
 - **Branded HTML reports** — fully self-contained, per-client styled reports with a built-in print-to-PDF button
 - **Screenshots & videos** — stored and displayed inline with lightbox modal in reports
 - **Shareable links** — 30-day expiring HMAC-signed URLs for client delivery, no login required
@@ -45,6 +48,7 @@ A self-hosted Cypress testing dashboard built with **Laravel 11** and **Filament
 - **User management** — admin panel to create and manage user accounts
 - **Artifact cleanup** — scheduled command to purge screenshots, videos, and reports older than N days
 - **Re-run** — trigger a new run from any completed run with one click
+- **Re-run failures** — re-run only the failing spec files from a completed run
 
 ---
 
@@ -54,15 +58,14 @@ A self-hosted Cypress testing dashboard built with **Laravel 11** and **Filament
 |---|---|
 | Backend framework | Laravel 11 |
 | Admin panel | Filament v3 |
-| Real-time / WebSocket | Laravel Reverb |
 | Frontend reactivity | Livewire 3 + Alpine.js |
 | Asset pipeline | Vite |
-| Queue driver | Redis |
-| Cache driver | Redis |
+| Queue driver | Database (dev) / Redis (production) |
+| Cache driver | File (dev) / Redis (production) |
 | Session driver | Database |
 | Database | SQLite (development) / MySQL or PostgreSQL (production) |
-| Test runner | Cypress (installed per-project via npm) |
-| Report parsing | Mochawesome JSON |
+| Test runners | Cypress and Playwright (installed per-project via npm) |
+| Report parsing | Mochawesome JSON (Cypress) / Playwright JSON reporter |
 
 ---
 
@@ -74,9 +77,9 @@ Install the following before running the application:
 |---|---|
 | PHP 8.2+ | Extensions: `pdo`, `openssl`, `mbstring`, `xml`, `curl` |
 | Composer | PHP dependency manager |
-| Node.js 18+ | Runtime for Vite and Cypress |
-| npm | Package manager for frontend and Cypress |
-| Redis | Required for production. Not needed locally — see Queue, Cache & Session below |
+| Node.js 18+ | Runtime for Vite, Cypress, and Playwright |
+| npm | Package manager for frontend and test runners |
+| Redis | Recommended for production. Not needed locally — see Queue, Cache & Session below |
 | Git | For cloning test repositories |
 | SSH | Required if using private Git repositories |
 
@@ -125,13 +128,10 @@ Then start the required processes — each in a separate terminal:
 # Terminal 1 — Web server (or use Laravel Herd / Valet)
 php artisan serve
 
-# Terminal 2 — Queue worker (processes Cypress test jobs)
-php artisan queue:work --timeout=3600 --tries=1
+# Terminal 2 — Queue worker (processes test jobs)
+php artisan queue:work --queue=cypress --timeout=3600 --tries=1
 
-# Terminal 3 — Reverb WebSocket server (live log streaming)
-php artisan reverb:start
-
-# Terminal 4 — Vite dev server (hot module reloading)
+# Terminal 3 — Vite dev server (hot module reloading)
 npm run dev
 ```
 
@@ -199,39 +199,20 @@ REDIS_PORT=6379
 
 > If using `QUEUE_CONNECTION=database` locally, run `php artisan queue:table && php artisan migrate` to create the jobs table.
 
-### Broadcasting (Reverb WebSocket)
-
-```env
-BROADCAST_CONNECTION=reverb
-
-REVERB_APP_ID=cypress-dashboard
-REVERB_APP_KEY=your-reverb-key        # Any unique string
-REVERB_APP_SECRET=your-reverb-secret  # Any unique string
-REVERB_HOST=localhost                 # Your domain in production
-REVERB_PORT=8080
-REVERB_SCHEME=http                    # Use https in production
-
-# Passed to the browser via Vite — must match the REVERB_ values above
-VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
-VITE_REVERB_HOST="${REVERB_HOST}"
-VITE_REVERB_PORT="${REVERB_PORT}"
-VITE_REVERB_SCHEME="${REVERB_SCHEME}"
-```
-
-> Reverb credentials are internal — they are not tied to any external service. Choose any unique strings.
-
 ### Git & Node
 
 ```env
 # Directory where project SSH deploy keys are written
 GIT_SSH_KEY_PATH=/home/www-data/.ssh
 
-# Absolute paths to Node and npm binaries on the server
+# Absolute paths to Node and npm binaries on the server.
+# Used by the web server for Playwright project discovery.
+# The deploy script auto-detects these via `which node` and `which npm`.
 NODE_PATH=/usr/local/bin/node
 NPM_PATH=/usr/local/bin/npm
 ```
 
-Find the correct paths with `which node` and `which npm`. These must be the paths accessible to the user running the queue worker (e.g. `www-data`).
+Find the correct paths with `which node` and `which npm`. These must be the paths accessible to the user running the queue worker and web server. The `deploy.sh` script auto-detects and updates these on each deployment.
 
 ### Storage
 
@@ -285,36 +266,36 @@ Reports are intentionally **not** stored in the public disk. They are served thr
 
 ## Queue & Real-time Workers
 
-All test runs are processed asynchronously by a queue worker. Live log output is broadcast to the browser via the Reverb WebSocket server.
+All test runs are processed asynchronously by a queue worker. Live log output is polled by the browser via Livewire every 3 seconds.
 
 ### Starting workers (development)
 
 ```bash
-php artisan queue:work --timeout=3600 --tries=1
-php artisan reverb:start
+php artisan queue:work --queue=cypress --timeout=3600 --tries=1
 ```
 
-> **Important:** The queue worker caches the application config on startup. After any change to `.env`, restart the worker: `php artisan queue:restart` (or kill and restart the process).
+> **Important:** Both Cypress and Playwright jobs dispatch to the `cypress` queue. The `--queue=cypress` flag is required.
+
+> The queue worker caches the application config on startup. After any change to `.env`, restart the worker: `php artisan queue:restart` (or kill and restart the process).
 
 ### Procfile
 
-The included `Procfile` defines both worker processes for hivemind/overmind:
+The included `Procfile` defines worker processes for hivemind/overmind:
 
 ```
-queue: php artisan queue:work --timeout=3600
-reverb: php artisan reverb:start
+queue: php artisan queue:work --queue=cypress --timeout=3600
 ```
 
 ### Production (Supervisor)
 
-Use Supervisor to keep both processes running and automatically restart them on failure.
+Use Supervisor to keep the queue worker running and automatically restart on failure.
 
 Create `/etc/supervisor/conf.d/cypress-dashboard.conf`:
 
 ```ini
 [program:cypress-queue]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/cypress-dashboard/artisan queue:work --timeout=3600 --tries=1 --sleep=3
+command=php /var/www/cypress-dashboard/artisan queue:work --queue=cypress --timeout=3600 --tries=1 --sleep=3
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -323,18 +304,6 @@ user=www-data
 numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/www/cypress-dashboard/storage/logs/queue.log
-
-[program:cypress-reverb]
-process_name=%(program_name)s
-command=php /var/www/cypress-dashboard/artisan reverb:start --host=0.0.0.0 --port=8080
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-user=www-data
-numprocs=1
-redirect_stderr=true
-stdout_logfile=/var/www/cypress-dashboard/storage/logs/reverb.log
 ```
 
 ```bash
@@ -388,9 +357,13 @@ Leave the deploy key fields blank.
 | View / download reports | ✅ | ✅ |
 | Share report links | ✅ | ✅ |
 | Re-run a test | ✅ | ✅ |
+| Re-run failures only | ✅ | ✅ |
+| Compare runs | ✅ | ✅ |
+| View flaky tests | ✅ | ✅ |
 | Manage clients | ✅ | ❌ |
 | Manage projects | ✅ | ❌ |
 | Manage test suites | ✅ | ❌ |
+| Playwright performance tuning | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
 | Delete test runs | ✅ | ❌ |
 
@@ -413,46 +386,62 @@ Roles are stored as a `role` string on the `users` table (`admin` or `pm`). Mana
 **Management → Projects → New Project**
 
 - Select the client and enter the repository URL and default branch
+- Choose the **Runner Type** — Cypress or Playwright
 - Generate a deploy key and add the public key to your Git provider (see [Deploy Keys](#deploy-keys-ssh))
 - Add any environment variables that all test suites in this project need (e.g. `CYPRESS_BASE_URL`)
+- For Playwright projects, use **Discover Projects** to auto-detect available browsers/devices from the repo's `playwright.config.ts`
 
 ### 3. Add Test Suites
 
 On the project page, open the **Test Suites** tab and create a suite:
 
-- **Spec pattern** — e.g. `cypress/e2e/**/*.cy.js` or `cypress/e2e/smoke/*.cy.js`
+- **Spec pattern** — e.g. `cypress/e2e/**/*.cy.js` (Cypress) or left blank for Playwright (uses config)
 - **Branch override** — leave blank to use the project's default branch
 - **Environment variables** — suite-specific overrides (merged on top of project-level vars)
 - **Timeout** — maximum minutes before the run is killed (default: 60)
+
+For **Playwright suites**:
+- **Playwright Projects** — select which browsers/devices to test (e.g. chromium, firefox, webkit)
+- **Performance Tuning** (admin only) — override parallel workers and retry count via CLI flags
 
 ### 4. Run Tests
 
 Go to **Testing → Test Runs** and click **Run Tests** in the top-right. Select project, suite, and branch, then click **Run**. The job is dispatched to the queue immediately.
 
-Click **View** on the queued run to open the live view, where log output streams in as Cypress runs.
+Click **View** on the queued run to open the live view, where console output updates as tests run.
 
 ---
 
 ## Running Tests
 
-The test job (`RunCypressTestJob`) performs these steps in order:
+Runner type is set at the project level. Each run snapshots the runner type at creation time, so historical runs remain valid.
 
-1. Clones the repository into a temporary directory
-2. Writes the SSH deploy key to disk and configures the `GIT_SSH_COMMAND` env var
-3. Sets status → `cloning` → `installing` → `running` (broadcast to UI at each step)
-4. Runs `npm install`
-5. Runs `npm run build:tailwind` if that script is defined in `package.json`
-6. Runs `npx cypress run --spec "{spec_pattern}"` with merged env vars
-7. Runs `npx mochawesome-merge` to combine per-spec JSON files
-8. Copies the merged JSON to the public storage disk
-9. Parses results into `test_results` rows in the database
-10. Maps video files to spec results
-11. Maps screenshot files to failed test results
-12. Generates the branded HTML report (stored on the private local disk)
-13. Broadcasts a final `status.changed` event to the browser
-14. Cleans up the temporary directory
+### Cypress Pipeline (`RunCypressTestJob`)
 
-If any step fails, the run is marked `error` and the error message is stored.
+1. Clone repository → `npm install` → build tailwind (if defined)
+2. Run `npx cypress run --spec "{spec_pattern}"` with merged env vars
+3. Merge mochawesome JSON reports → parse into `test_results` rows
+4. Map screenshots and videos to test results
+5. Generate branded HTML report
+6. Clean up temporary directory
+
+### Playwright Pipeline (`RunPlaywrightTestJob`)
+
+1. Clone repository → `npm install` → `npx playwright install --with-deps`
+2. Build tailwind (if defined)
+3. Run `npx playwright test` with `--reporter=line,json`, `--project` flags, and optional `--workers`/`--retries` overrides
+4. Parse Playwright JSON output into `test_results` rows
+5. Map screenshots (`.png`) and videos (`.webm`) from `test-results/` directory
+6. Generate branded HTML report
+7. Clean up temporary directory
+
+### Shared behaviour
+
+- Both runners use a shared `RunsTestSuite` trait for clone, install, streaming, and cleanup
+- Console output is streamed line-by-line with ANSI codes stripped, flushed to DB every 3 seconds
+- Status progresses through `pending` → `cloning` → `installing` → `running` → `passing`/`failed`/`error`
+- If 0 tests are found or executed, the run is marked `error`
+- If any step fails, the run is marked `error` and the error message is stored
 
 ---
 
@@ -538,17 +527,16 @@ php artisan runs:regenerate-reports
 ### Standard Laravel Commands
 
 ```bash
-php artisan migrate              # Run pending migrations
-php artisan migrate:fresh --seed # Drop all tables, re-run, and seed
-php artisan storage:link         # Create public disk symlink (run after fresh deploy)
-php artisan queue:work           # Start queue worker
-php artisan queue:restart        # Signal running workers to restart after next job
-php artisan reverb:start         # Start WebSocket server
-php artisan schedule:run         # Run due scheduled tasks (called by cron)
-php artisan config:cache         # Cache config (use in production)
-php artisan route:cache          # Cache routes (use in production)
-php artisan view:cache           # Cache views (use in production)
-php artisan cache:clear          # Clear application cache
+php artisan migrate                              # Run pending migrations
+php artisan migrate:fresh --seed                 # Drop all tables, re-run, and seed
+php artisan storage:link                         # Create public disk symlink (run after fresh deploy)
+php artisan queue:work --queue=cypress --timeout=3600  # Start queue worker
+php artisan queue:restart                        # Signal running workers to restart after next job
+php artisan schedule:run                         # Run due scheduled tasks (called by cron)
+php artisan config:cache                         # Cache config (use in production)
+php artisan route:cache                          # Cache routes (use in production)
+php artisan view:cache                           # Cache views (use in production)
+php artisan cache:clear                          # Clear application cache
 ```
 
 ---
@@ -575,7 +563,10 @@ cypress-dashboard/
 │   ├── Http/Controllers/
 │   │   └── ReportController.php         # html(), share() — serves report files
 │   ├── Jobs/
-│   │   └── RunCypressTestJob.php        # Core job: clone → install → run → report
+│   │   ├── Concerns/
+│   │   │   └── RunsTestSuite.php        # Shared trait: clone, install, stream, cleanup
+│   │   ├── RunCypressTestJob.php        # Cypress: run → parse mochawesome → report
+│   │   └── RunPlaywrightTestJob.php     # Playwright: install browsers → run → parse JSON → report
 │   ├── Models/
 │   │   ├── Client.php
 │   │   ├── Project.php                  # Encrypted deploy key + env vars
@@ -585,9 +576,13 @@ cypress-dashboard/
 │   │   └── User.php                     # isAdmin(), isPM(), canAccessPanel()
 │   ├── Providers/Filament/
 │   │   └── AdminPanelProvider.php       # Panel config, nav groups, colours
+│   ├── Enums/
+│   │   └── RunnerType.php               # Cypress | Playwright enum
 │   └── Services/
-│       ├── MochawesomeParserService.php # Parses merged JSON → TestResult rows
-│       └── ReportGeneratorService.php   # Renders HTML report, generates PDF
+│       ├── MochawesomeParserService.php # Parses Cypress merged JSON → TestResult rows
+│       ├── PlaywrightParserService.php  # Parses Playwright JSON → TestResult rows
+│       ├── PlaywrightConfigReaderService.php # Discovers browser projects from repo config
+│       └── ReportGeneratorService.php   # Renders HTML report
 ├── database/
 │   ├── migrations/                      # All schema migrations
 │   └── seeders/
@@ -616,24 +611,24 @@ Browser
   │
   ├── Filament Admin Panel (/admin)
   │     Livewire + Alpine.js
-  │     wire:poll → pollStatus() → dispatch('run-status-updated')
-  │     Alpine listens on window → updates status, reloads on completion
+  │     wire:poll.3s → pollStatus() → dispatch('run-status-updated', 'log-updated')
+  │     Alpine listens on window → updates status + console output, reloads on completion
   │
-  ├── Report Controller (/reports/...)
-  │     /run/{id}/html    — requires auth middleware
-  │     /share/{id}/{tok} — HMAC + expiry validation (no auth needed)
-  │
-  └── Reverb WebSocket (:8080)
-        Laravel Echo subscribes to test-run.{id} channel
-        Receives: status.changed, log.received events
+  └── Report Controller (/reports/...)
+        /run/{id}/html    — requires auth middleware
+        /share/{id}/{tok} — HMAC + expiry validation (no auth needed)
 
-Queue Worker
-  └── RunCypressTestJob
-        Clone → Install → Run Cypress → Parse → Store → Report
-        Broadcasts events to Reverb at each stage
+Queue Worker (--queue=cypress)
+  ├── RunCypressTestJob
+  │     Clone → Install → Run Cypress → Parse Mochawesome → Store → Report
+  └── RunPlaywrightTestJob
+        Clone → Install → Install Browsers → Run Playwright → Parse JSON → Store → Report
+
+  Both use RunsTestSuite trait: shared clone, install, stream, cleanup logic
+  Console output flushed to DB every 3s for polling
 
 Storage
-  ├── local disk (private)   — HTML + PDF reports
+  ├── local disk (private)   — HTML reports
   └── public disk            — Screenshots + videos (served via /storage/)
 ```
 
@@ -651,22 +646,29 @@ clients
 projects
   id, client_id, name, slug, description,
   repo_url, repo_provider, default_branch,
+  runner_type (cypress|playwright),
   deploy_key_private (encrypted), deploy_key_public,
   env_variables (encrypted JSON),
+  playwright_available_projects (JSON, nullable),
   active, deleted_at, timestamps
 
 test_suites
   id, project_id, name, slug, description,
   spec_pattern, branch_override,
   env_variables (encrypted JSON),
+  playwright_projects (JSON, nullable),
+  playwright_workers (nullable),
+  playwright_retries (nullable),
   timeout_minutes, active, deleted_at, timestamps
 
 test_runs
   id, project_id, test_suite_id, triggered_by (user_id),
+  runner_type (cypress|playwright),
   status, branch, commit_sha,
   total_tests, passed_tests, failed_tests, pending_tests,
   duration_ms, log_output, error_message,
   report_html_path, merged_json_path,
+  spec_override, parent_run_id,
   started_at, finished_at, timestamps
 
 test_results
@@ -726,15 +728,18 @@ sudo mv composer.phar /usr/local/bin/composer
 
 ---
 
-### Step 2 — Cypress headless dependencies
+### Step 2 — Test runner headless dependencies
 
-Cypress uses Electron which requires these system libraries even in headless mode:
+Cypress and Playwright require system libraries for headless browser execution:
 
 ```bash
+# Cypress (Electron) dependencies
 sudo apt install -y \
   xvfb libgtk-3-0t64 libnotify-dev \
   libnss3 libxss1 libasound2t64 libxtst6 xauth libgbm-dev
 ```
+
+> **Playwright** installs its own browser dependencies via `npx playwright install --with-deps` during each test run. No additional system packages are needed for Playwright beyond what Cypress requires.
 
 ---
 
@@ -808,7 +813,6 @@ sudo chmod 600 /etc/ssl/cloudflare/origin.key
 
 Then in Cloudflare:
 - **SSL/TLS → Overview** → set mode to **Full (strict)**
-- **Network** → **WebSockets** → **On**
 
 ---
 
@@ -845,17 +849,6 @@ server {
         include fastcgi_params;
     }
 
-    # Reverb WebSocket proxy — proxied through Nginx so everything uses port 443
-    location /app {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_read_timeout 60s;
-    }
-
     location ~ /\.(?!well-known).* { deny all; }
 }
 
@@ -880,7 +873,7 @@ Create `/etc/supervisor/conf.d/cypress-dashboard.conf`:
 
 ```ini
 [program:cypress-queue]
-command=php /var/www/cypress-dashboard/artisan queue:work --sleep=3 --tries=3 --timeout=300
+command=php /var/www/cypress-dashboard/artisan queue:work --queue=cypress --sleep=3 --tries=1 --timeout=3600
 directory=/var/www/cypress-dashboard
 user=cypressapp
 autostart=true
@@ -889,27 +882,16 @@ stopasgroup=true
 killasgroup=true
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/cypress-queue.log
-
-[program:cypress-reverb]
-command=php /var/www/cypress-dashboard/artisan reverb:start --host=127.0.0.1 --port=8080
-directory=/var/www/cypress-dashboard
-user=cypressapp
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/cypress-reverb.log
 ```
 
 ```bash
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl start cypress-queue cypress-reverb
+sudo supervisorctl start cypress-queue
 sudo supervisorctl status
 ```
 
-> **Note:** `--timeout=300` on the queue worker is important. Cypress runs can take several minutes and the default 60-second timeout will kill jobs mid-run.
+> **Note:** `--timeout=3600` on the queue worker is important. Test runs can take up to an hour and the default 60-second timeout will kill jobs mid-run. `--queue=cypress` is required — both Cypress and Playwright jobs dispatch to this queue.
 
 ---
 
@@ -949,18 +931,7 @@ DB_USERNAME=cypress
 DB_PASSWORD=your-strong-password
 
 QUEUE_CONNECTION=database
-
-REVERB_HOST=your-domain.com
-REVERB_PORT=443
-REVERB_SCHEME=https
-
-VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
-VITE_REVERB_HOST="${REVERB_HOST}"
-VITE_REVERB_PORT="${REVERB_PORT}"
-VITE_REVERB_SCHEME="${REVERB_SCHEME}"
 ```
-
-> Reverb listens internally on port 8080 but is proxied through Nginx on 443. Setting `REVERB_PORT=443` and `REVERB_SCHEME=https` tells Laravel Echo in the browser to connect on the standard HTTPS port.
 
 ---
 
@@ -982,6 +953,14 @@ GOOGLE_REDIRECT_URI=https://your-domain.com/auth/google/callback
 
 ### Deployment checklist (every deploy)
 
+A `deploy.sh` script is included that handles all of this automatically:
+
+```bash
+./deploy.sh
+```
+
+Or manually:
+
 ```bash
 git pull origin main
 composer install --no-dev --optimize-autoloader
@@ -993,8 +972,9 @@ php artisan route:cache
 php artisan view:cache
 php artisan storage:link
 php artisan queue:restart
-sudo supervisorctl restart cypress-reverb
 ```
+
+> The deploy script also auto-detects `NODE_PATH` and `NPM_PATH` and sets `APP_VERSION` from the latest git tag.
 
 ---
 
@@ -1044,7 +1024,6 @@ The default Laravel `.gitignore` already excludes everything sensitive:
 - `APP_KEY`
 - `DB_PASSWORD`
 - `REDIS_PASSWORD`
-- `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET`
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (if using S3)
 
 Store these as environment variables or encrypted secrets in your hosting platform (e.g. Forge, Ploi, GitHub Actions secrets).
@@ -1059,11 +1038,14 @@ Store these as environment variables or encrypted secrets in your hosting platfo
 **Share link returns 403 immediately**
 The link was generated before the most recent `APP_KEY` change (changing the key invalidates all HMAC tokens), or the link is over 30 days old. Generate a new link from the run view.
 
-**Run view stuck at "Cypress Tests running" after completion**
-Ensure the Reverb WebSocket server is running and `VITE_REVERB_*` values match `REVERB_*` in `.env`. The view also polls every 3 seconds as a fallback — if polling works but the WebSocket does not, check the Reverb server and browser console for connection errors.
+**Run view stuck at "Running tests" after completion**
+The view polls every 3 seconds via Livewire. If it's not updating, check that the queue worker is running and processing jobs. The page auto-reloads when the run completes.
 
 **Queue jobs not running / stuck in pending**
-Confirm Redis is running (`redis-cli ping` → `PONG`) and `QUEUE_CONNECTION=redis` is set. Start the worker: `php artisan queue:work --verbose`.
+Ensure the queue worker is listening on the correct queue: `php artisan queue:work --queue=cypress`. If using Redis, confirm it's running (`redis-cli ping` → `PONG`) and `QUEUE_CONNECTION=redis` is set.
+
+**Playwright "npm not found" during project discovery**
+The web server has a minimal `PATH`. Ensure `NPM_PATH` and `NODE_PATH` are set in `.env` to the absolute paths of your node/npm binaries. Run `which node` and `which npm` to find them. The `deploy.sh` script auto-detects these.
 
 **Git clone fails**
 Test SSH access manually as the web server user:
@@ -1071,10 +1053,11 @@ Test SSH access manually as the web server user:
 sudo -u www-data ssh -T git@github.com -o StrictHostKeyChecking=accept-new
 ```
 
-**Cypress not found in the job**
+**Cypress/Playwright not found in the job**
 Confirm `NODE_PATH` and `NPM_PATH` in `.env` point to binaries accessible by the queue worker user:
 ```bash
 sudo -u www-data /usr/local/bin/npx cypress --version
+sudo -u www-data /usr/local/bin/npx playwright --version
 ```
 
 **Auth redirect loop**

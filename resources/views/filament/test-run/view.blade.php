@@ -89,43 +89,49 @@
                 <div
                     id="log-container"
                     class="bg-gray-950 p-4 h-96 overflow-y-auto overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre"
-                    x-ref="logContainer"
-                ><span class="text-gray-500" x-show="!initialLog && !isRunning">Waiting for output...</span><div x-show="!initialLog && isRunning" class="py-1" x-data="{
+                >
+                    <span class="text-gray-500" x-show="!hasLog && !isRunning">Waiting for output...</span>
+
+                    {{-- Skeleton placeholder — hidden once real log data arrives --}}
+                    <div x-show="!hasLog && isRunning" class="py-1" x-data="{
                         phases: [
                             { text: '  Cloning repository...', color: 'log-cyan', delay: 400 },
                             { text: '  npm install running...', color: 'log-cyan', delay: 1200 },
                             { text: '  Dependencies resolved.', color: 'log-green', delay: 2800 },
                             { text: '', color: 'log-dim', delay: 3200 },
-                            { text: '  Starting Cypress...', color: 'log-cyan', delay: 3600 },
-                            { text: '  Browser: Electron 118 (headless)', color: 'log-dim', delay: 4400 },
+                            { text: '  Starting {{ $record->runner_type?->label() ?? "Cypress" }}...', color: 'log-cyan', delay: 3600 },
+                            { text: '  Preparing test environment...', color: 'log-dim', delay: 4400 },
                             { text: '', color: 'log-dim', delay: 4800 },
                             { text: '  Found spec files:', color: 'log-cyan', delay: 5200 },
                         ],
                         shown: [],
                         spinnerFrame: 0,
                         spinnerChars: ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'],
-                        specNames: ['account/account.spec.js','cart/cart.spec.js','checkout/checkout.spec.js','cms/cms-pages.spec.js','contact/contact.spec.js'],
+                        specNames: ['auth/login.spec.ts','dashboard/overview.spec.ts','checkout/payment.spec.ts','settings/profile.spec.ts','api/endpoints.spec.ts'],
                         currentSpec: 0,
-                        specTimer: null,
                         init() {
                             this.phases.forEach(p => {
                                 setTimeout(() => { this.shown.push(p); this.$nextTick(() => { const c = this.$el.closest('#log-container'); if(c) c.scrollTop = c.scrollHeight; }); }, p.delay);
                             });
                             setInterval(() => { this.spinnerFrame = (this.spinnerFrame + 1) % 10; }, 80);
-                            this.specTimer = setInterval(() => { this.currentSpec = (this.currentSpec + 1) % this.specNames.length; }, 3500);
+                            setInterval(() => { this.currentSpec = (this.currentSpec + 1) % this.specNames.length; }, 3500);
                         }
                     }">
-                    <template x-for="(p, i) in shown" :key="i">
-                        <div class="log-line" :class="p.color" x-text="p.text"></div>
-                    </template>
-                    <div x-show="shown.length >= 8" class="mt-2 space-y-1">
-                        <div class="log-dim">  ────────────────────────────────────────────</div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-yellow-400" x-text="spinnerChars[spinnerFrame]"></span>
-                            <span class="log-yellow">Running: </span><span class="log-dim font-mono" x-text="specNames[currentSpec]"></span>
+                        <template x-for="(p, i) in shown" :key="i">
+                            <div class="log-line" :class="p.color" x-text="p.text"></div>
+                        </template>
+                        <div x-show="shown.length >= 8" class="mt-2 space-y-1">
+                            <div class="log-dim">  ────────────────────────────────────────────</div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-yellow-400" x-text="spinnerChars[spinnerFrame]"></span>
+                                <span class="log-yellow">Running: </span><span class="log-dim font-mono" x-text="specNames[currentSpec]"></span>
+                            </div>
                         </div>
                     </div>
-                </div></div>
+
+                    {{-- Real log output — shown once data arrives --}}
+                    <div x-show="hasLog" x-html="logHtml"></div>
+                </div>
             </div>
 
             {{-- Test Results --}}
@@ -352,6 +358,9 @@
                 status: initialStatus,
                 isRunning: initiallyRunning,
                 initialLog: initialLog,
+                hasLog: !!initialLog,
+                logHtml: '',
+                _lastLogLength: 0,
 
                 _ansiUp: null,
                 getAnsiUp() {
@@ -402,7 +411,7 @@
                         pending: 'Waiting in queue',
                         cloning: 'Fetching repository from git',
                         installing: 'Running npm install',
-                        running: 'Cypress is executing tests',
+                        running: 'Executing tests...',
                         passing: 'All tests completed successfully',
                         failed: 'One or more tests failed',
                         error: 'An unexpected error occurred',
@@ -411,15 +420,24 @@
                     return desc[this.status] || '';
                 },
 
+                updateLog(log) {
+                    if (!log || !log.trim() || log.length <= this._lastLogLength) return;
+                    this.hasLog = true;
+                    this._lastLogLength = log.length;
+                    this.logHtml = this.ansiToHtml(log);
+                    this.$nextTick(() => {
+                        const c = document.getElementById('log-container');
+                        if (c) c.scrollTop = c.scrollHeight;
+                    });
+                },
+
                 init() {
-                    // Render initial log output directly from the JS variable
-                    const container = this.$refs.logContainer;
-                    if (container && this.initialLog) {
-                        container.innerHTML = this.ansiToHtml(this.initialLog);
-                        container.scrollTop = container.scrollHeight;
+                    // Render initial log output (e.g. viewing a completed run)
+                    if (this.initialLog) {
+                        this.updateLog(this.initialLog);
                     }
 
-                    // Sync Alpine status from Livewire pollStatus() dispatches
+                    // Sync status from Livewire poll
                     window.addEventListener('run-status-updated', (e) => {
                         const newStatus = e.detail.status;
                         if (newStatus && newStatus !== this.status) {
@@ -431,28 +449,11 @@
                         }
                     });
 
-                    if (!this.isRunning) return;
+                    // Update console from Livewire poll (works without WebSocket)
+                    window.addEventListener('log-updated', (e) => {
+                        this.updateLog(e.detail.log);
+                    });
 
-                    // Connect to Laravel Reverb via Echo for real-time updates
-                    if (typeof window.Echo === 'undefined') return;
-
-                    // private() is required — channels are now PrivateChannel server-side.
-                    window.Echo.private(`test-run.${this.runId}`)
-                        .listen('.log.received', (e) => {
-                            const container = this.$refs.logContainer;
-                            if (container) {
-                                container.innerHTML += this.ansiToHtml(e.message) + '<br>';
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        })
-                        .listen('.status.changed', (e) => {
-                            this.status = e.status;
-                            this.isRunning = ['pending','cloning','installing','running'].includes(e.status);
-
-                            if (!this.isRunning) {
-                                setTimeout(() => window.location.reload(), 1500);
-                            }
-                        });
                 }
             }
         }

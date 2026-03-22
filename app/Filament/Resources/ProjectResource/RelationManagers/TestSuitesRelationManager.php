@@ -15,6 +15,12 @@ class TestSuitesRelationManager extends RelationManager
 
     public function form(Form $form): Form
     {
+        $project = $this->getOwnerRecord();
+        $isPlaywright = $project->isPlaywright();
+        $defaultSpec = $isPlaywright
+            ? config('testing.playwright.default_spec_pattern')
+            : config('testing.cypress.default_spec_pattern');
+
         return $form->schema([
             Forms\Components\TextInput::make('name')
                 ->required()
@@ -22,9 +28,9 @@ class TestSuitesRelationManager extends RelationManager
 
             Forms\Components\TextInput::make('spec_pattern')
                 ->label('Spec Pattern')
-                ->placeholder('cypress/e2e/**/*.cy.{js,jsx,ts,tsx}')
+                ->placeholder($defaultSpec)
                 ->required()
-                ->default('cypress/e2e/**/*.cy.{js,jsx,ts,tsx}'),
+                ->default($defaultSpec),
 
             Forms\Components\TextInput::make('branch_override')
                 ->label('Branch Override')
@@ -38,6 +44,58 @@ class TestSuitesRelationManager extends RelationManager
             Forms\Components\Textarea::make('description')
                 ->rows(2)
                 ->columnSpanFull(),
+
+            ...($isPlaywright && !empty($project->playwright_available_projects)
+                ? [
+                    Forms\Components\CheckboxList::make('playwright_projects')
+                        ->label('Playwright Projects (Browsers / Devices)')
+                        ->options(array_combine(
+                            $project->playwright_available_projects,
+                            $project->playwright_available_projects,
+                        ))
+                        ->columns(3)
+                        ->columnSpanFull()
+                        ->helperText('Select which browsers/devices to run. Leave all unchecked to run all projects.'),
+                ]
+                : ($isPlaywright
+                    ? [
+                        Forms\Components\TagsInput::make('playwright_projects')
+                            ->label('Playwright Projects (Browsers / Devices)')
+                            ->placeholder('e.g. chromium, firefox, webkit, Mobile Safari')
+                            ->columnSpanFull()
+                            ->helperText('Type browser/device names, or use "Discover Projects" on the project edit page to auto-detect from playwright.config.ts.'),
+                    ]
+                    : []
+                )
+            ),
+
+            ...($isPlaywright && auth()->user()?->isAdmin()
+                ? [
+                    Forms\Components\Section::make('Performance Tuning')
+                        ->description('These settings override the project\'s playwright.config.ts values via CLI flags.')
+                        ->icon('heroicon-o-adjustments-horizontal')
+                        ->collapsed()
+                        ->columns(2)
+                        ->schema([
+                            Forms\Components\TextInput::make('playwright_workers')
+                                ->label('Parallel Workers')
+                                ->numeric()
+                                ->minValue(1)
+                                ->maxValue(16)
+                                ->placeholder('Config default')
+                                ->helperText('Number of parallel worker processes. Higher = faster but more resource intensive.'),
+
+                            Forms\Components\TextInput::make('playwright_retries')
+                                ->label('Retries')
+                                ->numeric()
+                                ->minValue(0)
+                                ->maxValue(5)
+                                ->placeholder('Config default')
+                                ->helperText('Number of retries for failed tests. 0 = no retries.'),
+                        ]),
+                ]
+                : []
+            ),
 
             Forms\Components\KeyValue::make('env_variables')
                 ->label('Environment Variable Overrides')

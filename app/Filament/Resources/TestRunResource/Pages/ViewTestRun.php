@@ -58,6 +58,7 @@ class ViewTestRun extends ViewRecord
     {
         $this->record = $this->record->fresh();
         $this->dispatch('run-status-updated', status: $this->record->status);
+        $this->dispatch('log-updated', log: $this->record->log_output ?? '');
     }
 
     protected function getHeaderActions(): array
@@ -70,7 +71,7 @@ class ViewTestRun extends ViewRecord
                 ->visible(fn () => $this->record->isRunning())
                 ->requiresConfirmation()
                 ->modalHeading('Cancel this test run?')
-                ->modalDescription('The running Cypress process will be terminated. This cannot be undone.')
+                ->modalDescription('The running test process will be terminated. This cannot be undone.')
                 ->action(function () {
                     $this->record->update([
                         'status'        => TestRun::STATUS_CANCELLED,
@@ -135,13 +136,14 @@ class ViewTestRun extends ViewRecord
                     $newRun = TestRun::create([
                         'project_id'    => $this->record->project_id,
                         'test_suite_id' => $this->record->test_suite_id,
+                        'runner_type'   => $this->record->runner_type,
                         'triggered_by'  => auth()->id(),
                         'status'        => TestRun::STATUS_PENDING,
                         'branch'        => $this->record->branch,
                         'parent_run_id' => $this->record->id,
                     ]);
 
-                    \App\Jobs\RunCypressTestJob::dispatch($newRun);
+                    $newRun->dispatchJob();
 
                     \Filament\Notifications\Notification::make()
                         ->title('Re-run queued!')
@@ -171,6 +173,7 @@ class ViewTestRun extends ViewRecord
                     $newRun = TestRun::create([
                         'project_id'    => $this->record->project_id,
                         'test_suite_id' => $this->record->test_suite_id,
+                        'runner_type'   => $this->record->runner_type,
                         'triggered_by'  => auth()->id(),
                         'status'        => TestRun::STATUS_PENDING,
                         'branch'        => $this->record->branch,
@@ -178,7 +181,7 @@ class ViewTestRun extends ViewRecord
                         'parent_run_id' => $this->record->id,
                     ]);
 
-                    \App\Jobs\RunCypressTestJob::dispatch($newRun);
+                    $newRun->dispatchJob();
 
                     \Filament\Notifications\Notification::make()
                         ->title('Re-run failures queued!')

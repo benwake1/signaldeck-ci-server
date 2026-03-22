@@ -95,7 +95,7 @@
                 @if($run->commit_sha)
                     <div><strong>Commit:</strong> <span class="font-code">{{ $run->commit_sha }}</span></div>
                 @endif
-                <div><strong>Powered By:</strong> Cypress</div>
+                <div><strong>Powered By:</strong> {{ $run->runner_type?->label() ?? 'Cypress' }}</div>
             </div>
         </div>
 

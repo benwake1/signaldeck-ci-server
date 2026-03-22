@@ -3,7 +3,6 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\TestRunResource\Pages\ViewTestRun;
-use App\Jobs\RunCypressTestJob;
 use App\Models\Project;
 use App\Models\TestRun;
 use App\Models\TestSuite;
@@ -26,15 +25,17 @@ class ProjectHealthWidget extends Widget
         // run triggering by an authenticated user who guesses numeric IDs.
         abort_if($suite->project_id !== $projectId, 403, 'Suite does not belong to this project.');
 
+        $project = Project::findOrFail($projectId);
         $run = TestRun::create([
             'project_id'    => $projectId,
             'test_suite_id' => $suiteId,
+            'runner_type'   => $project->runner_type,
             'triggered_by'  => auth()->id(),
             'status'        => TestRun::STATUS_PENDING,
             'branch'        => $suite->effective_branch,
         ]);
 
-        RunCypressTestJob::dispatch($run);
+        $run->dispatchJob();
 
         Notification::make()
             ->title('Test run queued!')

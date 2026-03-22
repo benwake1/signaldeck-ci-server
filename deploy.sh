@@ -48,6 +48,16 @@ run_as npm run build --silent
 echo "▶ Running database migrations..."
 run_as ${PHP} artisan migrate --force
 
+echo "▶ Auto-detecting Node/NPM paths..."
+DETECTED_NPM="$(run_as which npm 2>/dev/null || true)"
+DETECTED_NODE="$(run_as which node 2>/dev/null || true)"
+if [[ -n "${DETECTED_NPM}" ]]; then
+    run_as sed -i "s|^NPM_PATH=.*|NPM_PATH=${DETECTED_NPM}|" .env
+fi
+if [[ -n "${DETECTED_NODE}" ]]; then
+    run_as sed -i "s|^NODE_PATH=.*|NODE_PATH=${DETECTED_NODE}|" .env
+fi
+
 echo "▶ Setting app version from git tag..."
 APP_VERSION="${APP_VERSION:-$(run_as git describe --tags --abbrev=0 2>/dev/null || echo "dev")}"
 run_as sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env

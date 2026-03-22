@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\RunnerType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -23,12 +24,16 @@ class Project extends Model
         'default_branch',
         'deploy_key_private',
         'deploy_key_public',
+        'runner_type',
+        'playwright_available_projects',
         'env_variables',
         'active',
     ];
 
     protected $casts = [
         'active' => 'boolean',
+        'runner_type' => RunnerType::class,
+        'playwright_available_projects' => 'array',
     ];
 
     protected $hidden = [
@@ -107,6 +112,16 @@ class Project extends Model
         $this->save();
 
         return ['private' => $private, 'public' => $public];
+    }
+
+    public function isCypress(): bool
+    {
+        return ($this->runner_type ?? RunnerType::Cypress) === RunnerType::Cypress;
+    }
+
+    public function isPlaywright(): bool
+    {
+        return $this->runner_type === RunnerType::Playwright;
     }
 
     public function getLatestRunAttribute(): ?TestRun

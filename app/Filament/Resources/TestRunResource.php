@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TestRunResource\Pages;
-use App\Jobs\RunCypressTestJob;
 use App\Models\TestRun;
 use App\Models\TestSuite;
 use Filament\Forms;
@@ -89,6 +88,16 @@ class TestRunResource extends Resource
                 Tables\Columns\TextColumn::make('testSuite.name')
                     ->label('Suite')
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('runner_type')
+                    ->label('Runner')
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => $state instanceof \App\Enums\RunnerType ? $state->label() : (\App\Enums\RunnerType::tryFrom($state)?->label() ?? $state))
+                    ->color(fn ($state) => match ($state instanceof \App\Enums\RunnerType ? $state->value : $state) {
+                        'playwright' => 'success',
+                        default => 'info',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
@@ -193,15 +202,17 @@ class TestRunResource extends Resource
                             ->required(),
                     ])
                     ->action(function (array $data) {
+                        $project = \App\Models\Project::find($data['project_id']);
                         $run = TestRun::create([
                             'project_id' => $data['project_id'],
                             'test_suite_id' => $data['test_suite_id'],
+                            'runner_type' => $project->runner_type,
                             'triggered_by' => auth()->id(),
                             'status' => TestRun::STATUS_PENDING,
                             'branch' => $data['branch'],
                         ]);
 
-                        RunCypressTestJob::dispatch($run);
+                        $run->dispatchJob();
 
                         Notification::make()
                             ->title('Test run queued!')
