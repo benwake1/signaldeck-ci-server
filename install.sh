@@ -131,11 +131,14 @@ success "System packages installed."
 # -----------------------------------------------------------------------------
 # Step 2 — Cypress headless dependencies
 # -----------------------------------------------------------------------------
-header "Step 2 — Cypress headless dependencies"
+header "Step 2 — Browser headless dependencies"
 
 apt-get install -y -qq \
     xvfb libgtk-3-0t64 libnotify-dev \
     libnss3 libxss1 libasound2t64 libxtst6 xauth libgbm-dev
+
+info "Installing Playwright system dependencies..."
+npx playwright install-deps 2>&1 || true
 
 info "Installing Google Chrome (used by Cypress in preference to Electron)..."
 # Ubuntu 24.04 ships Chromium as a snap — Cypress cannot use snap-confined browsers.
@@ -160,7 +163,7 @@ exec /usr/bin/google-chrome-stable \
 EOF
 chmod +x /usr/local/bin/chrome-cypress
 
-success "Cypress headless dependencies installed."
+success "Browser headless dependencies installed."
 
 # -----------------------------------------------------------------------------
 # Step 3 — MySQL database

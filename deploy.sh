@@ -45,12 +45,6 @@ echo "▶ Installing Node dependencies and building assets..."
 run_as npm ci --silent
 run_as npm run build --silent
 
-echo "▶ Installing Playwright system dependencies..."
-# Installs OS-level shared libraries (libglib, libnss, etc.) that Playwright
-# browsers need. Runs as root (not run_as) because it uses apt-get internally.
-# The queue worker can then run `npx playwright install` without needing sudo.
-npx playwright install-deps 2>&1 || true
-
 echo "▶ Running database migrations..."
 run_as ${PHP} artisan migrate --force
 

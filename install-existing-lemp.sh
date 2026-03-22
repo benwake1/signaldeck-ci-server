@@ -273,12 +273,15 @@ read -rp "$(echo -e "${BOLD}Proceed?${NC} [y/N] ")" CONFIRM
 # -----------------------------------------------------------------------------
 # Step 2 — Cypress headless dependencies
 # -----------------------------------------------------------------------------
-header "Step 2 — Cypress headless dependencies"
+header "Step 2 — Browser headless dependencies"
 
 info "Installing headless browser dependencies..."
 apt-get install -y -qq \
     xvfb libgtk-3-0t64 libnotify-dev \
     libnss3 libxss1 libasound2t64 libxtst6 xauth libgbm-dev
+
+info "Installing Playwright system dependencies..."
+npx playwright install-deps 2>&1 || true
 
 if ! command -v google-chrome-stable &>/dev/null && ! command -v google-chrome &>/dev/null; then
     info "Installing Google Chrome (Cypress cannot use snap-confined Chromium)..."
@@ -300,7 +303,7 @@ exec /usr/bin/google-chrome-stable \
 EOF
 chmod +x /usr/local/bin/chrome-cypress
 
-success "Cypress headless dependencies installed."
+success "Browser headless dependencies installed."
 
 # -----------------------------------------------------------------------------
 # Step 3 — MySQL database (additive — no existing DBs touched)

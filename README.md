@@ -737,9 +737,12 @@ Cypress and Playwright require system libraries for headless browser execution:
 sudo apt install -y \
   xvfb libgtk-3-0t64 libnotify-dev \
   libnss3 libxss1 libasound2t64 libxtst6 xauth libgbm-dev
+
+# Playwright system dependencies (installs shared libraries via apt-get)
+npx playwright install-deps
 ```
 
-> **Playwright** installs its own browser dependencies via `npx playwright install --with-deps` during each test run. No additional system packages are needed for Playwright beyond what Cypress requires.
+> The `install.sh` and `install-existing-lemp.sh` scripts handle both of these automatically. Playwright browser binaries are downloaded per-user by the queue worker on the first test run.
 
 ---
 
