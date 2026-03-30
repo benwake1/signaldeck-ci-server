@@ -34,6 +34,7 @@ class TestRunResource extends JsonResource
             'log_output' => $this->when($includeLog, $this->log_output),
             'error_message' => $this->error_message,
             'report_html_path' => $this->report_html_path,
+            'report_share_url' => $this->report_share_url,
             'merged_json_path' => $this->merged_json_path,
             'started_at' => $this->started_at,
             'finished_at' => $this->finished_at,
