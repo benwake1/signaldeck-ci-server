@@ -88,12 +88,12 @@ class ProjectResource extends Resource
                         ->required()
                         ->columnSpanFull(),
 
-                    Forms\Components\Textarea::make('deploy_key_public')
-                        ->label('SSH Public Key (add this to your repo)')
-                        ->rows(3)
-                        ->extraAttributes(['style' => 'font-family: monospace; font-size: 0.75rem;'])
-                        ->columnSpanFull()
-                        ->helperText('Copy this public key and add it as a Deploy Key in your repository settings (read-only access is sufficient).'),
+                    Forms\Components\Placeholder::make('deploy_key_status')
+                        ->label('SSH Deploy Key')
+                        ->content(fn ($record) => $record?->getRawOriginal('deploy_key_public')
+                            ? '🔑 A deploy key is configured. Use "Generate Key" from the project list to replace it — the new key will be shown once in a notification.'
+                            : 'No deploy key generated. Use "Generate Key" from the project list.')
+                        ->columnSpanFull(),
                 ])->columns(2),
 
             Forms\Components\Section::make('Environment Variables')
@@ -224,8 +224,8 @@ class ProjectResource extends Resource
                     ->action(function (Project $record) {
                         $keys = $record->generateDeployKey();
                         Notification::make()
-                            ->title('Deploy key generated!')
-                            ->body('Public key: ' . $keys['public'])
+                            ->title('Deploy key generated — copy it now!')
+                            ->body("This is the only time this key will be shown. Copy it and add it to your repository as a deploy key (read-only access).\n\n" . $keys['public'])
                             ->success()
                             ->persistent()
                             ->send();

@@ -18,6 +18,7 @@ class ProjectResource extends JsonResource
             'repo_url' => $this->repo_url,
             'repo_provider' => $this->repo_provider,
             'default_branch' => $this->default_branch,
+            'has_deploy_key' => !empty($this->getRawOriginal('deploy_key_public')),
             'runner_type' => $this->runner_type,
             'playwright_available_projects' => $this->playwright_available_projects,
             'active' => $this->active,

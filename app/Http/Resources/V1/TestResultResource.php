@@ -27,6 +27,12 @@ class TestResultResource extends JsonResource
             'video_path' => $this->video_path,
             'video_url' => $this->video_url,
             'attempt' => $this->attempt,
+            'test_run' => $this->whenLoaded('testRun', fn () => [
+                'id'         => $this->testRun->id,
+                'status'     => $this->testRun->status,
+                'branch'     => $this->testRun->branch,
+                'created_at' => $this->testRun->created_at,
+            ]),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

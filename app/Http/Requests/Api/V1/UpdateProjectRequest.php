@@ -17,7 +17,7 @@ class UpdateProjectRequest extends FormRequest
         return [
             'client_id'      => ['sometimes', 'exists:clients,id'],
             'name'           => ['sometimes', 'string', 'max:255'],
-            'repo_url'       => ['sometimes', 'url'],
+            'repo_url'       => ['sometimes', 'string', 'regex:/^(https?:\/\/.+|git@.+:.+\.git)$/'],
             'repo_provider'  => ['nullable', 'string', 'in:github,gitlab,bitbucket'],
             'default_branch' => ['nullable', 'string', 'max:255'],
             'runner_type'    => ['sometimes', 'string', 'in:cypress,playwright'],

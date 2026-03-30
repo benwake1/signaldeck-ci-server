@@ -22,6 +22,7 @@ class TestSuiteResource extends JsonResource
             'playwright_workers' => $this->playwright_workers,
             'playwright_retries' => $this->playwright_retries,
             'timeout_minutes' => $this->timeout_minutes,
+            'env_variables' => empty($this->env_variables) ? null : $this->env_variables,
             'active' => $this->active,
             'latest_run' => new TestRunResource($this->whenLoaded('latestRun')),
             'project' => new ProjectResource($this->whenLoaded('project')),
