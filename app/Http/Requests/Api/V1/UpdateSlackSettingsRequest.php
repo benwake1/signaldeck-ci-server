@@ -9,10 +9,10 @@
 
 namespace App\Http\Requests\Api\V1;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateUserRequest extends FormRequest
+class UpdateSlackSettingsRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -21,14 +21,10 @@ class UpdateUserRequest extends FormRequest
 
     public function rules(): array
     {
-        $userId = $this->route('user')?->id ?? $this->route('user');
-
         return [
-            'name'          => ['sometimes', 'string', 'max:255'],
-            'email'         => ['sometimes', 'email', 'unique:users,email,' . $userId],
-            'password'      => ['sometimes', 'string', 'min:8', 'confirmed'],
-            'role'          => ['sometimes', 'in:admin,pm'],
-            'slack_user_id' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'slack_notifications_enabled' => ['sometimes', 'boolean'],
+            'slack_bot_token'             => ['sometimes', 'nullable', 'string'],
+            'slack_signing_secret'        => ['sometimes', 'nullable', 'string'],
         ];
     }
 

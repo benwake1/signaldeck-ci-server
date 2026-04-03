@@ -121,6 +121,9 @@ Route::middleware(['auth:sanctum', EnsureApiTokenAbility::class.':desktop:admin'
     Route::post('settings/mail/test', [SettingsController::class, 'testMail']);
     Route::get('settings/sso', [SettingsController::class, 'sso']);
     Route::put('settings/sso', [SettingsController::class, 'updateSso']);
+    Route::get('settings/slack', [SettingsController::class, 'slack']);
+    Route::put('settings/slack', [SettingsController::class, 'updateSlack']);
+    Route::post('settings/slack/test', [SettingsController::class, 'testSlack']);
 
     // Users
     Route::get('users', [UserController::class, 'index']);

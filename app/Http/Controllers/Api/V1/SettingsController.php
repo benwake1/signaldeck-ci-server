@@ -12,8 +12,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\UpdateMailSettingsRequest;
 use App\Http\Requests\Api\V1\UpdateSettingsRequest;
+use App\Http\Requests\Api\V1\UpdateSlackSettingsRequest;
 use App\Http\Requests\Api\V1\UpdateSsoSettingsRequest;
 use App\Models\AppSetting;
+use App\Services\SlackService;
 use App\Services\SsoConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Crypt;
@@ -123,6 +125,41 @@ class SettingsController extends Controller
         }
 
         return response()->json(['providers' => $providers]);
+    }
+
+    // MARK: - Slack
+
+    public function slack(): JsonResponse
+    {
+        return response()->json([
+            'slack_notifications_enabled' => AppSetting::get('slack_notifications_enabled', '0') === '1',
+            'slack_has_bot_token'         => (bool) AppSetting::get('slack_bot_token'),
+            'slack_has_signing_secret'    => (bool) AppSetting::get('slack_signing_secret'),
+        ]);
+    }
+
+    public function updateSlack(UpdateSlackSettingsRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+
+        if (array_key_exists('slack_notifications_enabled', $data)) {
+            AppSetting::set('slack_notifications_enabled', $data['slack_notifications_enabled'] ? '1' : '0');
+        }
+
+        foreach (['slack_bot_token', 'slack_signing_secret'] as $key) {
+            if (! empty($data[$key])) {
+                AppSetting::set($key, Crypt::encryptString($data[$key]));
+            }
+        }
+
+        return response()->json(['message' => 'Slack settings updated.']);
+    }
+
+    public function testSlack(SlackService $slack): JsonResponse
+    {
+        $result = $slack->testConnection();
+
+        return response()->json($result, $result['ok'] ? 200 : 422);
     }
 
     public function updateSso(UpdateSsoSettingsRequest $request, SsoConfigService $ssoConfig): JsonResponse
