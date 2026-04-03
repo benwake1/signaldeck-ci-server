@@ -24,7 +24,7 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 16. [REST API](#rest-api)
 17. [SSO (Single Sign-On)](#sso-single-sign-on)
 18. [Slack Notifications](#slack-notifications)
-19. [macOS Companion App - SignalDeck CI](#macos-companion-app)
+19. [macOS Companion App - SignalDeck CI](#macos-companion-app-signaldeck-ci)
 20. [Project Structure](#project-structure)
 21. [Architecture Overview](#architecture-overview)
 22. [Database Schema](#database-schema)
@@ -740,7 +740,7 @@ If a user's Slack account uses a different email than their dashboard account, a
 
 ---
 
-## macOS Companion App - SignalDeck CI
+## macOS Companion App SignalDeck CI
 
 A native **SwiftUI macOS app** provides a lightweight desktop interface for monitoring runs and triggering new ones without opening a browser. It connects to the dashboard REST API using a Sanctum token and supports SSO login via a custom URL scheme.
 
