@@ -1,6 +1,6 @@
 # Test Dashboard
 
-A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 11** and **Filament v3**. Trigger test suites from a web UI, watch live output stream in real time, generate branded per-client HTML reports, and deliver expiring shareable links to clients — no third-party testing service required.
+A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12** and **Filament v3**. Trigger test suites from a web UI, watch live output stream in real time, generate branded per-client HTML reports, and deliver expiring shareable links to clients — no third-party testing service required.
 
 ---
 
@@ -21,12 +21,16 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 11
 13. [Reports](#reports)
 14. [Scheduled Tasks & Artifact Cleanup](#scheduled-tasks--artifact-cleanup)
 15. [Artisan Commands Reference](#artisan-commands-reference)
-16. [Project Structure](#project-structure)
-17. [Architecture Overview](#architecture-overview)
-18. [Database Schema](#database-schema)
-19. [Deployment (VPS + Cloudflare)](#deployment)
-20. [Git Repository Setup](#git-repository-setup)
-21. [Troubleshooting](#troubleshooting)
+16. [REST API](#rest-api)
+17. [SSO (Single Sign-On)](#sso-single-sign-on)
+18. [Slack Notifications](#slack-notifications)
+19. [macOS Companion App](#macos-companion-app)
+20. [Project Structure](#project-structure)
+21. [Architecture Overview](#architecture-overview)
+22. [Database Schema](#database-schema)
+23. [Deployment (VPS + Cloudflare)](#deployment)
+24. [Git Repository Setup](#git-repository-setup)
+25. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -44,8 +48,15 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 11
 - **Branded HTML reports** — fully self-contained, per-client styled reports with a built-in print-to-PDF button
 - **Screenshots & videos** — stored and displayed inline with lightbox modal in reports
 - **Shareable links** — 30-day expiring HMAC-signed URLs for client delivery, no login required
+- **Run comparison** — compare any two completed runs side-by-side to spot regressions
+- **Flaky test tracking** — identify tests that intermittently pass and fail across runs
+- **Test history** — per-test trend view across multiple runs
 - **Role-based access** — Admin (full access) and PM (run tests, view reports only)
 - **User management** — admin panel to create and manage user accounts
+- **Single Sign-On (SSO)** — Google and GitHub OAuth login, configurable from the admin UI
+- **Slack DM notifications** — bot token integration sends a DM to the triggering user when a run completes
+- **REST API v1** — full Sanctum token-authenticated API for all resources; consumed by the macOS companion app
+- **macOS companion app** — native SwiftUI desktop app for monitoring and triggering runs (separate repo)
 - **Artifact cleanup** — scheduled command to purge screenshots, videos, and reports older than N days
 - **Re-run** — trigger a new run from any completed run with one click
 - **Re-run failures** — re-run only the failing spec files from a completed run
@@ -56,10 +67,13 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 11
 
 | Layer | Technology |
 |---|---|
-| Backend framework | Laravel 11 |
+| Backend framework | Laravel 12 |
 | Admin panel | Filament v3 |
 | Frontend reactivity | Livewire 3 + Alpine.js |
 | Asset pipeline | Vite |
+| Real-time transport | Laravel Reverb (WebSockets) |
+| API authentication | Laravel Sanctum (Bearer tokens) |
+| OAuth / SSO | Laravel Socialite + filament-socialite |
 | Queue driver | Database (dev) / Redis (production) |
 | Cache driver | File (dev) / Redis (production) |
 | Session driver | Database |
@@ -131,7 +145,10 @@ php artisan serve
 # Terminal 2 — Queue worker (processes test jobs)
 php artisan queue:work --queue=cypress --timeout=3600 --tries=1
 
-# Terminal 3 — Vite dev server (hot module reloading)
+# Terminal 3 — Reverb WebSocket server
+php artisan reverb:start
+
+# Terminal 4 — Vite dev server (hot module reloading)
 npm run dev
 ```
 
@@ -153,9 +170,22 @@ APP_ENV=local                    # local | production
 APP_KEY=                         # Set automatically by php artisan key:generate
 APP_DEBUG=true                   # Set to false in production
 APP_URL=https://your-domain.com  # Full URL — used in report and share link generation
+APP_VERSION=dev                  # Set automatically by deploy.sh from git tag
 ```
 
 > `APP_URL` must be correct. Report URLs and shareable links are built from this value. If the queue worker starts with the wrong `APP_URL`, restart it after updating `.env`.
+
+### Branding (optional)
+
+```env
+BRAND_NAME=                          # Panel display name; defaults to APP_NAME
+BRAND_PRIMARY_COLOR=                 # Hex colour, e.g. #4f46e5
+BRAND_LOGO_PATH=images/logo.svg      # Light-mode logo, path relative to public/
+BRAND_LOGO_DARK_PATH=images/logo-white.svg
+BRAND_LOGO_HEIGHT=2rem
+BRAND_FAVICON_PATH=                  # e.g. images/favicon.png
+COMPANY_LEGAL_NAME="Your Company Ltd"
+```
 
 ### Database
 
@@ -179,6 +209,7 @@ For **local development** (no Redis required):
 
 ```env
 QUEUE_CONNECTION=database
+DB_QUEUE_RETRY_AFTER=14400   # Must be >= CYPRESS_JOB_TIMEOUT to prevent re-queuing mid-run
 CACHE_STORE=file
 SESSION_DRIVER=database
 SESSION_LIFETIME=120
@@ -199,6 +230,26 @@ REDIS_PORT=6379
 
 > If using `QUEUE_CONNECTION=database` locally, run `php artisan queue:table && php artisan migrate` to create the jobs table.
 
+### Reverb (WebSockets)
+
+```env
+BROADCAST_CONNECTION=reverb
+
+REVERB_APP_ID=my-app-id
+REVERB_APP_KEY=my-app-key
+REVERB_APP_SECRET=my-app-secret
+REVERB_HOST=localhost
+REVERB_PORT=8080
+REVERB_SCHEME=http
+
+VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
+VITE_REVERB_HOST="${REVERB_HOST}"
+VITE_REVERB_PORT="${REVERB_PORT}"
+VITE_REVERB_SCHEME="${REVERB_SCHEME}"
+```
+
+> In production, Reverb typically runs on a separate port (e.g. 8080) proxied through Nginx. See [Deployment](#deployment) for the Nginx WebSocket proxy configuration.
+
 ### Git & Node
 
 ```env
@@ -218,6 +269,22 @@ Find the correct paths with `which node` and `which npm`. These must be the path
 
 ```env
 FILESYSTEM_DISK=local   # Do not change — reports use the private local disk
+
+# Optional S3 config
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+```
+
+### SSO (optional)
+
+SSO providers can be toggled from **Settings → Single Sign-On** in the admin UI without touching `.env`. The env vars below are only needed if you prefer to configure SSO via environment rather than the UI.
+
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI="${APP_URL}/admin/oauth/callback/google"
 ```
 
 ---
@@ -266,12 +333,13 @@ Reports are intentionally **not** stored in the public disk. They are served thr
 
 ## Queue & Real-time Workers
 
-All test runs are processed asynchronously by a queue worker. Live log output is polled by the browser via Livewire every 3 seconds.
+All test runs are processed asynchronously by a queue worker. Live log output is broadcast over WebSockets via Laravel Reverb.
 
 ### Starting workers (development)
 
 ```bash
 php artisan queue:work --queue=cypress --timeout=3600 --tries=1
+php artisan reverb:start
 ```
 
 > **Important:** Both Cypress and Playwright jobs dispatch to the `cypress` queue. The `--queue=cypress` flag is required.
@@ -284,11 +352,12 @@ The included `Procfile` defines worker processes for hivemind/overmind:
 
 ```
 queue: php artisan queue:work --queue=cypress --timeout=3600
+reverb: php artisan reverb:start
 ```
 
 ### Production (Supervisor)
 
-Use Supervisor to keep the queue worker running and automatically restart on failure.
+Use Supervisor to keep the queue worker and Reverb running and automatically restart on failure.
 
 Create `/etc/supervisor/conf.d/cypress-dashboard.conf`:
 
@@ -304,6 +373,18 @@ user=www-data
 numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/www/cypress-dashboard/storage/logs/queue.log
+
+[program:cypress-reverb]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/cypress-dashboard/artisan reverb:start --host=0.0.0.0 --port=8080
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/cypress-dashboard/storage/logs/reverb.log
 ```
 
 ```bash
@@ -360,12 +441,15 @@ Leave the deploy key fields blank.
 | Re-run failures only | ✅ | ✅ |
 | Compare runs | ✅ | ✅ |
 | View flaky tests | ✅ | ✅ |
+| View test history | ✅ | ✅ |
 | Manage clients | ✅ | ❌ |
 | Manage projects | ✅ | ❌ |
 | Manage test suites | ✅ | ❌ |
 | Playwright performance tuning | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
 | Delete test runs | ✅ | ❌ |
+| Manage settings (mail, SSO, Slack) | ✅ | ❌ |
+| Generate API tokens | ✅ | ❌ |
 
 Roles are stored as a `role` string on the `users` table (`admin` or `pm`). Manage users at **Admin → Users** in the panel.
 
@@ -408,7 +492,7 @@ For **Playwright suites**:
 
 Go to **Testing → Test Runs** and click **Run Tests** in the top-right. Select project, suite, and branch, then click **Run**. The job is dispatched to the queue immediately.
 
-Click **View** on the queued run to open the live view, where console output updates as tests run.
+Click **View** on the queued run to open the live view, where console output updates in real time via WebSockets.
 
 ---
 
@@ -438,7 +522,7 @@ Runner type is set at the project level. Each run snapshots the runner type at c
 ### Shared behaviour
 
 - Both runners use a shared `RunsTestSuite` trait for clone, install, streaming, and cleanup
-- Console output is streamed line-by-line with ANSI codes stripped, flushed to DB every 3 seconds
+- Console output is broadcast in real time over WebSockets (Laravel Reverb) and also flushed to DB for reconnections
 - Status progresses through `pending` → `cloning` → `installing` → `running` → `passing`/`failed`/`error`
 - If 0 tests are found or executed, the run is marked `error`
 - If any step fails, the run is marked `error` and the error message is stored
@@ -472,6 +556,10 @@ The link embeds a 30-day UTC expiry timestamp and an HMAC-SHA256 token signed wi
 ```
 https://your-dashboard.com/reports/share/{run_id}/{token}?expires={unix_timestamp}
 ```
+
+### Run Comparison
+
+**Testing → Compare Runs** — select any two completed runs from the same project to compare results side-by-side. Highlights tests that changed status between runs.
 
 ---
 
@@ -532,6 +620,7 @@ php artisan migrate:fresh --seed                 # Drop all tables, re-run, and 
 php artisan storage:link                         # Create public disk symlink (run after fresh deploy)
 php artisan queue:work --queue=cypress --timeout=3600  # Start queue worker
 php artisan queue:restart                        # Signal running workers to restart after next job
+php artisan reverb:start                         # Start WebSocket server
 php artisan schedule:run                         # Run due scheduled tasks (called by cron)
 php artisan config:cache                         # Cache config (use in production)
 php artisan route:cache                          # Cache routes (use in production)
@@ -541,33 +630,182 @@ php artisan cache:clear                          # Clear application cache
 
 ---
 
+## REST API
+
+The dashboard exposes a versioned REST API at `/api/v1`, authenticated with **Laravel Sanctum** Bearer tokens. This is the same API consumed by the macOS companion app.
+
+### Authentication
+
+```
+POST /api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.com", "password": "password" }
+```
+
+Returns a Sanctum token. Pass it as `Authorization: Bearer {token}` on subsequent requests.
+
+### Token abilities
+
+Tokens are scoped with abilities. Admin users can generate tokens in **Settings → API Tokens**.
+
+| Ability | Grants |
+|---|---|
+| `desktop:read` | Read all resources (runs, results, logs, reports, analytics) |
+| `desktop:write` | Trigger and cancel test runs |
+| `desktop:admin` | Full CRUD on clients, projects, suites, users, and settings |
+
+### Key endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/health` | Health check (unauthenticated) |
+| `POST` | `/api/v1/auth/login` | Obtain a Sanctum token |
+| `POST` | `/api/v1/auth/logout` | Revoke current token |
+| `GET` | `/api/v1/auth/user` | Authenticated user profile |
+| `GET` | `/api/v1/auth/sso/providers` | List enabled SSO providers |
+| `GET` | `/api/v1/dashboard/stats` | Summary counts for the dashboard |
+| `GET` | `/api/v1/clients` | List clients |
+| `GET` | `/api/v1/projects` | List projects |
+| `GET` | `/api/v1/projects/{id}/suites` | List suites for a project |
+| `GET` | `/api/v1/test-runs` | List test runs (filterable) |
+| `POST` | `/api/v1/test-runs` | Trigger a new test run |
+| `GET` | `/api/v1/test-runs/{id}` | Run detail |
+| `GET` | `/api/v1/test-runs/{id}/results` | Per-test results |
+| `GET` | `/api/v1/test-runs/{id}/logs` | Raw console output |
+| `GET` | `/api/v1/test-runs/{id}/report` | Report URL / download |
+| `GET` | `/api/v1/test-runs/compare` | Compare two runs |
+| `POST` | `/api/v1/test-runs/{id}/cancel` | Cancel a queued/running run |
+| `GET` | `/api/v1/flaky-tests` | Flaky test analytics |
+| `GET` | `/api/v1/test-history` | Per-test run history |
+| `GET` | `/api/v1/settings` | Read admin settings |
+| `PUT` | `/api/v1/settings/slack` | Update Slack settings |
+| `PUT` | `/api/v1/settings/sso` | Update SSO settings |
+
+---
+
+## SSO (Single Sign-On)
+
+The dashboard supports Google and GitHub OAuth login. SSO is configured from **Settings → Single Sign-On** in the admin panel — no `.env` changes are required once the app credentials are set.
+
+### Google OAuth setup
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services → Credentials**, create an OAuth 2.0 client ID.
+2. Add the following to **Authorised redirect URIs**:
+   ```
+   https://your-domain.com/admin/oauth/callback/google
+   ```
+3. In the admin panel, go to **Settings → Single Sign-On**, enable Google, and enter your Client ID and Secret.
+4. Save. The "Sign in with Google" button will appear on the login page immediately.
+
+### GitHub OAuth setup
+
+1. In GitHub → **Settings → Developer settings → OAuth Apps**, create a new app.
+2. Set **Authorization callback URL** to:
+   ```
+   https://your-domain.com/admin/oauth/callback/github
+   ```
+3. In the admin panel, go to **Settings → Single Sign-On**, enable GitHub, and enter your Client ID and Secret.
+
+### Notes
+
+- Users are matched by email. If no user exists with the SSO email, login is rejected (no self-registration).
+- SSO and password login can coexist — users can still log in with email/password.
+- The macOS companion app uses a dedicated SSO flow via `/api/v1/auth/sso/*` with a custom URL scheme callback (`cypressdashboard://`).
+
+---
+
+## Slack Notifications
+
+When enabled, the dashboard sends a Slack DM to the user who triggered a test run when it completes (pass or fail).
+
+### Setup
+
+1. Create a **Slack App** at [api.slack.com/apps](https://api.slack.com/apps):
+   - Add the `users:read.email` and `chat:write` OAuth scopes under **Bot Token Scopes**
+   - Install the app to your workspace
+   - Copy the **Bot User OAuth Token** (`xoxb-...`)
+2. In the admin panel, go to **Settings → Slack**, enable notifications, paste the bot token, and click **Test Connection**.
+
+### How it works
+
+- When a run finishes with status `passing` or `failed`, a `TestRunStatusChanged` event is fired.
+- The `SendTestRunSlackNotification` listener looks up the triggering user's Slack ID via their email address (`users.lookupByEmail` API).
+- A Block Kit DM is sent to that user with the run summary (client, project, suite, pass/fail counts, and a link to the report).
+- Each run sends at most one DM (deduplicated via cache).
+
+### Per-user Slack ID override
+
+If a user's Slack account uses a different email than their dashboard account, an admin can set a manual **Slack User ID** override on the user's profile in **Admin → Users**.
+
+---
+
+## macOS Companion App
+
+A native **SwiftUI macOS app** provides a lightweight desktop interface for monitoring runs and triggering new ones without opening a browser. It connects to the dashboard REST API using a Sanctum token and supports SSO login via a custom URL scheme.
+
+The macOS app lives in a **separate repository**. See that repo's README for installation and build instructions.
+
+To generate an API token for the app:
+1. Log in to the dashboard as an Admin
+2. Go to **Settings → API Tokens**
+3. Create a token with the `desktop:read` and `desktop:write` abilities (add `desktop:admin` if the app needs settings access)
+4. Paste the token into the macOS app's connection settings
+
+---
+
 ## Project Structure
 
 ```
 cypress-dashboard/
 ├── app/
 │   ├── Console/Commands/
-│   │   ├── CleanupOldArtifacts.php      # runs:cleanup
-│   │   └── RegenerateReports.php        # runs:regenerate-reports
+│   │   ├── CleanupOldArtifacts.php       # runs:cleanup
+│   │   └── RegenerateReports.php         # runs:regenerate-reports
 │   ├── Events/
-│   │   ├── TestRunStatusChanged.php     # Broadcast: status, counts, report URLs
-│   │   └── TestRunLogReceived.php       # Broadcast: live log lines
-│   ├── Filament/Resources/
-│   │   ├── ClientResource.php           # Admin-only: client CRUD
-│   │   ├── ProjectResource.php          # Admin-only: project CRUD
-│   │   ├── TestRunResource.php          # All users: test runs table + trigger action
-│   │   ├── UserResource.php             # Admin-only: user management
-│   │   └── TestRunResource/Pages/
-│   │       ├── ListTestRuns.php
-│   │       └── ViewTestRun.php          # Live polling, share/download/re-run actions
-│   ├── Http/Controllers/
-│   │   └── ReportController.php         # html(), share() — serves report files
+│   │   ├── TestRunStatusChanged.php      # Broadcast: status, counts, report URLs
+│   │   └── TestRunLogReceived.php        # Broadcast: live log lines
+│   ├── Filament/
+│   │   ├── Pages/
+│   │   │   ├── CompareRuns.php           # Side-by-side run comparison
+│   │   │   ├── FlakyTests.php            # Flaky test analytics
+│   │   │   ├── TestHistory.php           # Per-test history trend
+│   │   │   ├── MailSettingsPage.php      # SMTP mail configuration
+│   │   │   ├── SlackSettingsPage.php     # Slack bot token + notification toggle
+│   │   │   ├── SsoSettingsPage.php       # OAuth provider configuration
+│   │   │   └── SettingsPage.php          # General settings
+│   │   └── Resources/
+│   │       ├── ClientResource.php        # Admin-only: client CRUD
+│   │       ├── ProjectResource.php       # Admin-only: project CRUD
+│   │       ├── TestRunResource.php       # All users: test runs table + trigger action
+│   │       └── UserResource.php          # Admin-only: user management
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── Api/V1/                   # REST API controllers (Sanctum-protected)
+│   │   │   │   ├── AuthController.php
+│   │   │   │   ├── SsoAuthController.php
+│   │   │   │   ├── ClientController.php
+│   │   │   │   ├── ProjectController.php
+│   │   │   │   ├── TestRunController.php
+│   │   │   │   ├── TestSuiteController.php
+│   │   │   │   ├── DashboardController.php
+│   │   │   │   ├── FlakyTestController.php
+│   │   │   │   ├── TestHistoryController.php
+│   │   │   │   ├── SettingsController.php
+│   │   │   │   ├── UserController.php
+│   │   │   │   └── HealthController.php
+│   │   │   └── ReportController.php      # html(), share() — serves report files
+│   │   └── Middleware/
+│   │       └── EnsureApiTokenAbility.php # Sanctum ability checks per route group
 │   ├── Jobs/
 │   │   ├── Concerns/
-│   │   │   └── RunsTestSuite.php        # Shared trait: clone, install, stream, cleanup
-│   │   ├── RunCypressTestJob.php        # Cypress: run → parse mochawesome → report
-│   │   └── RunPlaywrightTestJob.php     # Playwright: install browsers → run → parse JSON → report
+│   │   │   └── RunsTestSuite.php         # Shared trait: clone, install, stream, cleanup
+│   │   ├── RunCypressTestJob.php         # Cypress: run → parse mochawesome → report
+│   │   └── RunPlaywrightTestJob.php      # Playwright: install browsers → run → parse JSON → report
+│   ├── Listeners/
+│   │   └── SendTestRunSlackNotification.php  # DMs the triggering user on run completion
 │   ├── Models/
+│   │   ├── AppSetting.php               # Key/value store for DB-backed settings
 │   │   ├── Client.php
 │   │   ├── Project.php                  # Encrypted deploy key + env vars
 │   │   ├── TestRun.php                  # Status constants, URL accessors
@@ -579,10 +817,12 @@ cypress-dashboard/
 │   ├── Enums/
 │   │   └── RunnerType.php               # Cypress | Playwright enum
 │   └── Services/
-│       ├── MochawesomeParserService.php # Parses Cypress merged JSON → TestResult rows
-│       ├── PlaywrightParserService.php  # Parses Playwright JSON → TestResult rows
-│       ├── PlaywrightConfigReaderService.php # Discovers browser projects from repo config
-│       └── ReportGeneratorService.php   # Renders HTML report
+│       ├── MochawesomeParserService.php  # Parses Cypress merged JSON → TestResult rows
+│       ├── PlaywrightParserService.php   # Parses Playwright JSON → TestResult rows
+│       ├── PlaywrightConfigReaderService.php  # Discovers browser projects from repo config
+│       ├── ReportGeneratorService.php    # Renders HTML report
+│       ├── SlackService.php              # Slack API: token validation, user lookup, DM sending
+│       └── SsoConfigService.php          # Reads SSO provider config from DB or .env
 ├── database/
 │   ├── migrations/                      # All schema migrations
 │   └── seeders/
@@ -594,6 +834,7 @@ cypress-dashboard/
 │   └── reports/
 │       └── branded.blade.php            # Self-contained HTML report template
 ├── routes/
+│   ├── api.php                          # REST API routes (/api/v1)
 │   ├── web.php                          # Web + report routes
 │   └── console.php                      # Scheduled tasks
 ├── .env.example                         # Environment variable template
@@ -607,16 +848,20 @@ cypress-dashboard/
 ## Architecture Overview
 
 ```
-Browser
+Browser / macOS App
   │
   ├── Filament Admin Panel (/admin)
   │     Livewire + Alpine.js
-  │     wire:poll.3s → pollStatus() → dispatch('run-status-updated', 'log-updated')
-  │     Alpine listens on window → updates status + console output, reloads on completion
+  │     WebSocket (Reverb) → live log + status updates
+  │     wire:poll fallback → pollStatus() on reconnect
   │
-  └── Report Controller (/reports/...)
-        /run/{id}/html    — requires auth middleware
-        /share/{id}/{tok} — HMAC + expiry validation (no auth needed)
+  ├── Report Controller (/reports/...)
+  │     /run/{id}/html    — requires auth middleware
+  │     /share/{id}/{tok} — HMAC + expiry validation (no auth needed)
+  │
+  └── REST API (/api/v1)
+        Sanctum Bearer token authentication
+        Ability-scoped routes: desktop:read / desktop:write / desktop:admin
 
 Queue Worker (--queue=cypress)
   ├── RunCypressTestJob
@@ -625,11 +870,21 @@ Queue Worker (--queue=cypress)
         Clone → Install → Install Browsers → Run Playwright → Parse JSON → Store → Report
 
   Both use RunsTestSuite trait: shared clone, install, stream, cleanup logic
-  Console output flushed to DB every 3s for polling
+  Console output broadcast over WebSockets (Reverb) + flushed to DB every 3s
+
+  On completion → TestRunStatusChanged event
+    └── SendTestRunSlackNotification listener → Slack DM to triggering user
+
+Reverb WebSocket Server
+  Channels: test-run.{id}  →  log lines + status changes
 
 Storage
   ├── local disk (private)   — HTML reports
   └── public disk            — Screenshots + videos (served via /storage/)
+
+AppSetting model (key/value)
+  ├── Slack: bot token, notification toggle
+  └── SSO: provider credentials, enabled flags
 ```
 
 ---
@@ -677,7 +932,12 @@ test_results
   screenshot_paths (JSON array), video_path, attempt, timestamps
 
 users
-  id, name, email, password, role (admin|pm), timestamps
+  id, name, email, password, role (admin|pm),
+  slack_user_id (nullable override),
+  timestamps
+
+app_settings
+  id, key, value, timestamps
 ```
 
 ---
@@ -843,6 +1103,16 @@ server {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
+    # Reverb WebSocket proxy
+    location /app {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; }
 
@@ -885,12 +1155,23 @@ stopasgroup=true
 killasgroup=true
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/cypress-queue.log
+
+[program:cypress-reverb]
+command=php /var/www/cypress-dashboard/artisan reverb:start --host=0.0.0.0 --port=8080
+directory=/var/www/cypress-dashboard
+user=cypressapp
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/cypress-reverb.log
 ```
 
 ```bash
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl start cypress-queue
+sudo supervisorctl start cypress-queue cypress-reverb
 sudo supervisorctl status
 ```
 
@@ -934,22 +1215,10 @@ DB_USERNAME=cypress
 DB_PASSWORD=your-strong-password
 
 QUEUE_CONNECTION=database
-```
 
----
-
-### Google OAuth (production)
-
-In Google Cloud Console → **APIs & Services → Credentials → your OAuth client**, add to **Authorised redirect URIs**:
-
-```
-https://your-domain.com/auth/google/callback
-```
-
-Update `.env`:
-
-```env
-GOOGLE_REDIRECT_URI=https://your-domain.com/auth/google/callback
+REVERB_HOST=your-domain.com
+REVERB_PORT=443
+REVERB_SCHEME=https
 ```
 
 ---
@@ -1027,9 +1296,9 @@ The default Laravel `.gitignore` already excludes everything sensitive:
 - `APP_KEY`
 - `DB_PASSWORD`
 - `REDIS_PASSWORD`
+- `REVERB_APP_SECRET`
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (if using S3)
-
-Store these as environment variables or encrypted secrets in your hosting platform (e.g. Forge, Ploi, GitHub Actions secrets).
+- `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_SECRET` (if using SSO)
 
 ---
 
@@ -1041,8 +1310,8 @@ Store these as environment variables or encrypted secrets in your hosting platfo
 **Share link returns 403 immediately**
 The link was generated before the most recent `APP_KEY` change (changing the key invalidates all HMAC tokens), or the link is over 30 days old. Generate a new link from the run view.
 
-**Run view stuck at "Running tests" after completion**
-The view polls every 3 seconds via Livewire. If it's not updating, check that the queue worker is running and processing jobs. The page auto-reloads when the run completes.
+**Live log not updating in the run view**
+Check that Reverb is running (`php artisan reverb:start`) and that the `VITE_REVERB_*` env vars match `REVERB_*`. In production, verify the Nginx WebSocket proxy for `/app` is configured correctly. The view will fall back to polling if WebSockets are unavailable.
 
 **Queue jobs not running / stuck in pending**
 Ensure the queue worker is listening on the correct queue: `php artisan queue:work --queue=cypress`. If using Redis, confirm it's running (`redis-cli ping` → `PONG`) and `QUEUE_CONNECTION=redis` is set.
@@ -1072,8 +1341,17 @@ npm uses `~/.npm` as its cache directory. The web server user (`www-data`) typic
 sudo mkdir -p /var/www/.npm && sudo chown -R www-data:www-data /var/www/.npm
 ```
 
-**`Class "App\Http\Controllers\Controller" not found`**
-Laravel 11 removed the base `Controller` class from the default skeleton. `ReportController` does not extend it. If you have other controllers that do, remove the `extends Controller` line.
+**SSO login fails / redirect error**
+Check that the redirect URI registered in your OAuth provider exactly matches `APP_URL/admin/oauth/callback/{provider}`. Ensure the provider is enabled in **Settings → Single Sign-On** and the client ID/secret are saved.
+
+**Slack DM not received**
+- Verify the bot token is valid via **Settings → Slack → Test Connection**
+- Confirm the Slack app has `users:read.email` and `chat:write` bot scopes and is installed to the workspace
+- Check `storage/logs/laravel.log` for `Slack users.lookupByEmail` or `chat.postMessage` warnings
+- If the user's Slack email differs from their dashboard email, set a manual **Slack User ID** override on their user profile
+
+**API token returning 401**
+Sanctum tokens are ability-scoped. Ensure the token has the required ability (`desktop:read`, `desktop:write`, or `desktop:admin`) for the endpoint you are calling.
 
 ---
 
@@ -1081,8 +1359,11 @@ Laravel 11 removed the base `Controller` class from the default skeleton. `Repor
 
 - **Deploy keys** are stored encrypted at rest using Laravel's `Crypt` facade (AES-256-CBC via `APP_KEY`)
 - **Project and suite environment variables** are also encrypted at rest
+- **Slack bot token** is stored encrypted in the `app_settings` table
+- **SSO client secrets** are stored encrypted in the `app_settings` table
 - **Reports** are served through authenticated routes — never accessible via direct `/storage/` URL
 - **Shareable links** use HMAC-SHA256 — unforgeable without the `APP_KEY`, and expire after 30 days
+- **API tokens** are Sanctum Personal Access Tokens stored as hashed values; they cannot be retrieved after creation
 - **`APP_KEY`** is the root secret for encryption and HMAC signing — back it up securely and never rotate it without re-encrypting stored data
 
 ---
