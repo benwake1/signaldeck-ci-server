@@ -87,6 +87,7 @@ class PlaywrightConfigReaderService
             Log::warning('Playwright project discovery failed', [
                 'project_id' => $project->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         } finally {

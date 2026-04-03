@@ -31,7 +31,8 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $user = Auth::user();
+        // Refresh user to pick up any role changes that occurred after Auth::attempt
+        $user = Auth::user()->fresh();
 
         // Revoke any existing desktop-app tokens (single active token policy)
         $user->tokens()->where('name', 'desktop-app')->delete();

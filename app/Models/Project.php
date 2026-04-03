@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Project extends Model
@@ -94,6 +95,10 @@ class Project extends Model
         try {
             return json_decode(Crypt::decryptString($value), true) ?? [];
         } catch (\Exception $e) {
+            Log::warning('Failed to decrypt env variables for project', [
+                'id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
             return [];
         }
     }

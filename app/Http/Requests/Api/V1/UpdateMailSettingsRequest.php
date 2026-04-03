@@ -23,8 +23,8 @@ class UpdateMailSettingsRequest extends FormRequest
     {
         return [
             'mail_driver'       => ['nullable', 'in:smtp,sendmail,ses,mailgun,log'],
-            'mail_host'         => ['nullable', 'string'],
-            'mail_port'         => ['nullable', 'integer'],
+            'mail_host'         => ['nullable', 'string', 'regex:/^[a-zA-Z0-9.\-]+$/'],
+            'mail_port'         => ['nullable', 'integer', 'between:1,65535'],
             'mail_username'     => ['nullable', 'string'],
             'mail_password'     => ['nullable', 'string'],
             'mail_encryption'   => ['nullable', 'in:tls,ssl,null'],

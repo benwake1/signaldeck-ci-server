@@ -40,7 +40,8 @@ class FlakyTestController extends Controller
             $query->where('test_runs.project_id', (int) $request->input('project_id'));
         }
 
-        $results = $query->paginate(50);
+        $page = max(1, min((int) $request->input('page', 1), 10000));
+        $results = $query->paginate(50, ['*'], 'page', $page);
 
         return response()->json($results);
     }

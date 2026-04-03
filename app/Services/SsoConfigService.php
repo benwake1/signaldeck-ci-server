@@ -117,9 +117,9 @@ class SsoConfigService
     /**
      * Save an encrypted credential for a provider.
      */
-    public function setCredential(string $key, string $value): void
+    public function setCredential(string $provider, string $key, string $value): void
     {
-        AppSetting::set($key, $value !== '' ? Crypt::encryptString($value) : '');
+        AppSetting::set("sso_{$provider}_{$key}", $value !== '' ? Crypt::encryptString($value) : '');
     }
 
     /**

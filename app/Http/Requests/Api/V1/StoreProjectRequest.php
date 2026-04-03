@@ -26,7 +26,7 @@ class StoreProjectRequest extends FormRequest
             'name'           => ['required', 'string', 'max:255'],
             'repo_url'       => ['required', 'string', 'regex:/^(https?:\/\/.+|git@.+:.+\.git)$/'],
             'repo_provider'  => ['nullable', 'string', 'in:github,gitlab,bitbucket'],
-            'default_branch' => ['nullable', 'string', 'max:255'],
+            'default_branch' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\-_.\/]+$/'],
             'runner_type'    => ['required', 'string', 'in:cypress,playwright'],
             'env_variables'  => ['nullable', 'array'],
         ];

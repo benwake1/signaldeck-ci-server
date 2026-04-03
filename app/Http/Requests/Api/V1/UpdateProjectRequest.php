@@ -26,7 +26,7 @@ class UpdateProjectRequest extends FormRequest
             'name'           => ['sometimes', 'string', 'max:255'],
             'repo_url'       => ['sometimes', 'string', 'regex:/^(https?:\/\/.+|git@.+:.+\.git)$/'],
             'repo_provider'  => ['nullable', 'string', 'in:github,gitlab,bitbucket'],
-            'default_branch' => ['nullable', 'string', 'max:255'],
+            'default_branch' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\-_.\/]+$/'],
             'runner_type'    => ['sometimes', 'string', 'in:cypress,playwright'],
             'env_variables'  => ['nullable', 'array'],
         ];

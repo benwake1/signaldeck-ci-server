@@ -83,8 +83,9 @@ class TestRun extends Model
 
     public function getPassRateAttribute(): float
     {
-        if ($this->total_tests === 0) return 0;
-        return round(($this->passed_tests / $this->total_tests) * 100, 1);
+        $total = $this->total_tests ?? 0;
+        if ($total === 0) return 0;
+        return round((($this->passed_tests ?? 0) / $total) * 100, 1);
     }
 
     public function getDurationFormattedAttribute(): string

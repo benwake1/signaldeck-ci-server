@@ -9,6 +9,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Services\SsoConfigService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Auth\Access\AuthorizationException;
 
@@ -22,7 +23,7 @@ class UpdateSsoSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'provider'      => ['required', 'string', 'in:google,github'],
+            'provider'      => ['required', 'string', 'in:' . implode(',', array_keys(SsoConfigService::PROVIDERS))],
             'enabled'       => ['required', 'boolean'],
             'client_id'     => ['nullable', 'string'],
             'client_secret' => ['nullable', 'string'],

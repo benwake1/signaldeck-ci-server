@@ -18,6 +18,7 @@ use App\Services\PlaywrightConfigReaderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Log;
 
 class ProjectController extends Controller
 {
@@ -93,7 +94,11 @@ class ProjectController extends Controller
                 'projects' => $projects,
             ]);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Discovery failed: '.$e->getMessage()], 500);
+            Log::error('Playwright project discovery failed', [
+                'project_id' => $project->id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['message' => 'Project discovery failed. Please check server logs.'], 500);
         }
     }
 }

@@ -118,12 +118,14 @@ Route::middleware(['auth:sanctum', EnsureApiTokenAbility::class.':desktop:admin'
     Route::put('settings', [SettingsController::class, 'update']);
     Route::get('settings/mail', [SettingsController::class, 'mail']);
     Route::put('settings/mail', [SettingsController::class, 'updateMail']);
-    Route::post('settings/mail/test', [SettingsController::class, 'testMail']);
+    Route::post('settings/mail/test', [SettingsController::class, 'testMail'])
+        ->middleware('throttle:3,1');
     Route::get('settings/sso', [SettingsController::class, 'sso']);
     Route::put('settings/sso', [SettingsController::class, 'updateSso']);
     Route::get('settings/slack', [SettingsController::class, 'slack']);
     Route::put('settings/slack', [SettingsController::class, 'updateSlack']);
-    Route::post('settings/slack/test', [SettingsController::class, 'testSlack']);
+    Route::post('settings/slack/test', [SettingsController::class, 'testSlack'])
+        ->middleware('throttle:3,1');
 
     // Users
     Route::get('users', [UserController::class, 'index']);

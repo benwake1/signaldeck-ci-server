@@ -21,13 +21,14 @@ class DashboardController extends Controller
         $thirtyDaysAgo = Carbon::now()->subDays(30);
         $sevenDaysAgo  = Carbon::now()->subDays(7);
 
-        $completedRuns = TestRun::where('created_at', '>=', $thirtyDaysAgo)
+        $runStats = TestRun::where('created_at', '>=', $thirtyDaysAgo)
             ->whereIn('status', [TestRun::STATUS_PASSING, TestRun::STATUS_FAILED])
-            ->get();
+            ->selectRaw("COUNT(*) as total, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as passing", [TestRun::STATUS_PASSING])
+            ->first();
 
-        $totalRuns  = $completedRuns->count();
-        $passingRuns = $completedRuns->where('status', TestRun::STATUS_PASSING)->count();
-        $passRate   = $totalRuns > 0 ? round(($passingRuns / $totalRuns) * 100, 1) : 0;
+        $totalRuns   = (int) $runStats->total;
+        $passingRuns = (int) $runStats->passing;
+        $passRate    = $totalRuns > 0 ? round(($passingRuns / $totalRuns) * 100, 1) : 0;
 
         $currentlyRunning = TestRun::whereIn('status', [
             TestRun::STATUS_PENDING,

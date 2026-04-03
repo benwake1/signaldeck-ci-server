@@ -74,6 +74,7 @@ class SsoAuthController extends Controller
                 'name' => $socialiteUser->getName(),
                 'avatar_url' => $socialiteUser->getAvatar(),
                 'password' => bcrypt(str()->random(32)),
+                'role' => 'pm',
             ]
         );
 

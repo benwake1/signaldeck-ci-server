@@ -11,6 +11,7 @@ namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Validation\Rule;
 
 class TriggerTestRunRequest extends FormRequest
 {
@@ -22,9 +23,11 @@ class TriggerTestRunRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'project_id'    => ['required', 'exists:projects,id'],
-            'test_suite_id' => ['required', 'exists:test_suites,id'],
-            'branch'        => ['nullable', 'string', 'max:255'],
+            'project_id'    => ['required', 'exists:projects,id,deleted_at,NULL'],
+            'test_suite_id' => ['required', Rule::exists('test_suites', 'id')
+                ->where('project_id', $this->input('project_id'))
+                ->whereNull('deleted_at')],
+            'branch'        => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\-_.\/]+$/'],
         ];
     }
 
