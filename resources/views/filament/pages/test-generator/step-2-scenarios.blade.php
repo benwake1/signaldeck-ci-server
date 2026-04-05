@@ -26,17 +26,19 @@
                     wire:click="toggleScenario('{{ $key }}')"
                     type="button"
                     @class([
-                        'relative flex flex-col items-start p-4 rounded-lg border-2 text-left transition-all w-full',
+                        'flex flex-col items-start p-4 rounded-lg border-2 text-left transition-all w-full',
                         'border-primary-500 bg-primary-50 dark:bg-primary-900/20' => $checked,
                         'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600' => !$checked,
                     ])
                 >
-                    @if($checked)
-                        <x-heroicon-s-check-circle class="w-4 h-4 text-primary-500 absolute top-3 right-3" />
-                    @else
-                        <x-heroicon-o-circle-stack class="w-4 h-4 text-gray-300 dark:text-gray-600 absolute top-3 right-3" />
-                    @endif
-                    <p class="font-medium text-gray-900 dark:text-white text-sm pr-6">{{ $scenario['label'] }}</p>
+                    <div class="flex items-start justify-between w-full gap-2">
+                        <p class="font-medium text-gray-900 dark:text-white text-sm">{{ $scenario['label'] }}</p>
+                        @if($checked)
+                            <x-heroicon-s-check-circle class="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
+                        @else
+                            <x-heroicon-o-circle-stack class="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" />
+                        @endif
+                    </div>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $scenario['description'] }}</p>
                 </button>
             @endforeach

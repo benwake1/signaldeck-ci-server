@@ -10,11 +10,11 @@
 
         {{-- URLs --}}
         <div>
-            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">URLs</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">URLs</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <div>
-                    <label for="baseUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="baseUrl" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                         Base URL <span class="text-danger-500">*</span>
                     </label>
                     <input
@@ -28,8 +28,8 @@
                 </div>
 
                 <div>
-                    <label for="adminUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Admin URL <span class="text-xs text-gray-400">(optional)</span>
+                    <label for="adminUrl" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                        Admin URL <span class="text-xs text-gray-400 dark:text-gray-500">(optional)</span>
                     </label>
                     <input
                         id="adminUrl"
@@ -48,12 +48,12 @@
 
         {{-- Credentials --}}
         <div>
-            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Test Account Credentials</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Test Account Credentials</h3>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">These will be embedded in your test fixtures. Use a dedicated test account — never production credentials.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <div>
-                    <label for="testEmail" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="testEmail" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                         Test Email <span class="text-danger-500">*</span>
                     </label>
                     <input
@@ -66,7 +66,7 @@
                 </div>
 
                 <div>
-                    <label for="testPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="testPassword" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                         Test Password <span class="text-danger-500">*</span>
                     </label>
                     <input
@@ -85,11 +85,11 @@
 
         {{-- Runner Options --}}
         <div>
-            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Runner Options</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Runner Options</h3>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
                 <div>
-                    <label for="timeoutSeconds" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="timeoutSeconds" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                         Timeout (seconds)
                     </label>
                     <input
@@ -104,7 +104,7 @@
                 </div>
 
                 <div class="flex flex-col justify-between">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Headless Mode</label>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-1">Headless Mode</label>
                     <button
                         wire:click="$toggle('headless')"
                         type="button"
@@ -134,13 +134,13 @@
 
             <div>
                 <div class="flex items-center gap-2 mb-4">
-                    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Playwright Options</h3>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Playwright Options</h3>
                     <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">Playwright only</span>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                     <div>
-                        <label for="pwWorkers" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label for="pwWorkers" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                             Parallel Workers
                         </label>
                         <input
@@ -155,7 +155,7 @@
                     </div>
 
                     <div>
-                        <label for="pwRetries" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label for="pwRetries" class="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                             Retries on Failure
                         </label>
                         <input

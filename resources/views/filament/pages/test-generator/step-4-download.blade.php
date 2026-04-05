@@ -81,69 +81,81 @@
         </div>
 
         {{-- What's inside the ZIP --}}
-        <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-4">
+        <div class="rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">What's in the ZIP</h3>
-            <div class="font-mono text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+            <div class="font-mono text-xs text-gray-800 dark:text-gray-200 space-y-0.5">
                 @if($framework === 'cypress')
-                    <p><span class="text-gray-400">📦</span> cypress-tests/</p>
-                    <p class="pl-4"><span class="text-gray-400">├</span> cypress.config.js</p>
-                    <p class="pl-4"><span class="text-gray-400">├</span> package.json</p>
-                    <p class="pl-4"><span class="text-gray-400">├</span> cypress/support/</p>
-                    <p class="pl-4"><span class="text-gray-400">├</span> cypress/fixtures/ <span class="text-gray-400 font-sans">(selectors + credentials)</span></p>
-                    <p class="pl-4"><span class="text-gray-400">└</span> cypress/e2e/ <span class="text-gray-400 font-sans">({{ count($selectedScenarios) }} test {{ Str::plural('file', count($selectedScenarios)) }})</span></p>
+                    <p>📦 cypress-tests/</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">├</span> cypress.config.js</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">├</span> package.json</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">├</span> cypress/support/</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">├</span> cypress/fixtures/ <span class="text-gray-500 dark:text-gray-400 font-sans">(selectors + credentials)</span></p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">└</span> cypress/e2e/ <span class="text-gray-500 dark:text-gray-400 font-sans">({{ count($selectedScenarios) }} test {{ Str::plural('file', count($selectedScenarios)) }})</span></p>
                 @else
-                    <p><span class="text-gray-400">📦</span> playwright-tests/</p>
-                    <p class="pl-4"><span class="text-gray-400">├</span> playwright.config.ts</p>
-                    <p class="pl-4"><span class="text-gray-400">├</span> package.json</p>
-                    <p class="pl-4"><span class="text-gray-400">└</span> tests/ <span class="text-gray-400 font-sans">({{ count($selectedScenarios) }} test {{ Str::plural('file', count($selectedScenarios)) }})</span></p>
+                    <p>📦 playwright-tests/</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">├</span> playwright.config.ts</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">├</span> package.json</p>
+                    <p class="pl-4"><span class="text-gray-400 dark:text-gray-600">└</span> tests/ <span class="text-gray-500 dark:text-gray-400 font-sans">({{ count($selectedScenarios) }} test {{ Str::plural('file', count($selectedScenarios)) }})</span></p>
                 @endif
             </div>
         </div>
 
         {{-- Customisation disclaimer --}}
-        <div class="rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 flex gap-3">
+        <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 flex items-start gap-3">
             <x-heroicon-o-wrench-screwdriver class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-            <div class="text-sm text-amber-800 dark:text-amber-300 space-y-1">
-                <p class="font-medium">These tests will need customisation</p>
-                <p class="text-xs text-amber-700 dark:text-amber-400">
-                    The generated suite is a <strong>starting point</strong>, not a production-ready test suite. Selectors, product paths, and test data are based on common patterns for your chosen platform and will need to be updated to match your specific store's DOM structure, product catalogue, and checkout flow. Customising the test suite is outside the scope of this generator — it is your responsibility to review, adapt, and validate each test file before connecting it to SignalDeck CI.
+            <div>
+                <p class="text-sm font-medium text-amber-800 dark:text-amber-200">These tests will need customisation</p>
+                <p class="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    The generated suite is a <strong class="font-semibold">starting point</strong>, not a production-ready test suite. Selectors, product paths, and test data are based on common patterns for your chosen platform and will need to be updated to match your specific store's DOM structure, product catalogue, and checkout flow.
                 </p>
             </div>
         </div>
 
         {{-- Next steps callout --}}
-        <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 flex gap-3">
-            <x-heroicon-o-information-circle class="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-            <div class="text-sm text-blue-800 dark:text-blue-300 space-y-3">
-                <p class="font-medium">Next steps after downloading</p>
+        <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 overflow-hidden">
 
-                <div class="space-y-1">
-                    <p class="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">1 — Set up locally</p>
-                    <ol class="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-400 text-xs pl-1">
-                        <li>Unzip and drop the folder into your repo root.</li>
-                        <li>Run <code class="bg-blue-100 dark:bg-blue-900 px-1 rounded">npm install</code> inside the test folder.</li>
+            <div class="px-4 py-3 flex items-center gap-3 border-b border-blue-200 dark:border-blue-800">
+                <x-heroicon-o-information-circle class="h-5 w-5 text-blue-500 shrink-0" />
+                <p class="text-sm font-medium text-blue-800 dark:text-blue-200">Next steps after downloading</p>
+            </div>
+
+            <div class="px-4 py-4 space-y-5">
+
+                {{-- Section 1 --}}
+                <div>
+                    <p class="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">1 — Set up locally</p>
+                    <div class="space-y-1.5 text-sm text-blue-700 dark:text-blue-300">
+                        <p>1. Unzip and drop the folder into your repo root.</p>
+                        <p>2. Run <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">npm install</code> inside the test folder.</p>
                         @if($framework === 'playwright')
-                            <li>Run <code class="bg-blue-100 dark:bg-blue-900 px-1 rounded">npm run install:browsers</code> to download Playwright's browser binaries.</li>
+                        <p>3. Run <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">npm run install:browsers</code> to download Playwright's browser binaries.</p>
                         @endif
-                        <li>Update selectors, product URLs, and test data to match your store.</li>
-                        <li>Review any commented-out sections (e.g. guest checkout order placement) before enabling them.</li>
-                        <li>Run <code class="bg-blue-100 dark:bg-blue-900 px-1 rounded">{{ $framework === 'cypress' ? 'npm test' : 'npm test' }}</code> locally to confirm everything passes.</li>
-                    </ol>
+                        <p>{{ $framework === 'playwright' ? '4' : '3' }}. Update selectors, product URLs, and test data to match your store.</p>
+                        <p>{{ $framework === 'playwright' ? '5' : '4' }}. Review any commented-out sections (e.g. guest checkout order placement) before enabling them.</p>
+                        <p>{{ $framework === 'playwright' ? '6' : '5' }}. Run <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">npm test</code> locally to confirm everything passes.</p>
+                    </div>
                 </div>
 
-                <div class="space-y-1">
-                    <p class="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
-                        2 — Connect to SignalDeck CI
-                        <a href="https://docs.signaldeck.tech/docs/guides/projects-and-suites" target="_blank" class="normal-case font-normal ml-2 underline underline-offset-2 hover:text-blue-900 dark:hover:text-blue-200">docs ↗</a>
-                    </p>
-                    <ol class="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-400 text-xs pl-1">
-                        <li>Go to <strong class="text-blue-800 dark:text-blue-200">Projects → New Project</strong> and create a project for your store.</li>
-                        <li>Under <strong class="text-blue-800 dark:text-blue-200">Project Settings → Runner</strong>, set the framework to <strong class="text-blue-800 dark:text-blue-200">{{ $framework === 'cypress' ? 'Cypress' : 'Playwright' }}</strong> and the test directory to <code class="bg-blue-100 dark:bg-blue-900 px-1 rounded">{{ $framework === 'cypress' ? 'cypress/e2e' : 'tests/' }}</code>.</li>
-                        <li>Add your store URL as the <strong class="text-blue-800 dark:text-blue-200">Base URL</strong> in the project configuration.</li>
-                        <li>Trigger a test run from the dashboard or connect your CI pipeline using the SignalDeck API token shown in project settings.</li>
-                        <li>Monitor results, screenshots, and failure reports from the <strong class="text-blue-800 dark:text-blue-200">Test Runs</strong> view.</li>
-                    </ol>
+                <div class="border-t border-blue-200 dark:border-blue-800"></div>
+
+                {{-- Section 2 --}}
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">2 — Connect to SignalDeck CI</p>
+                        <a href="https://docs.signaldeck.tech/docs/guides/projects-and-suites" target="_blank"
+                           class="inline-flex items-center gap-1 rounded border border-blue-300 dark:border-blue-700 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">
+                            View docs ↗
+                        </a>
+                    </div>
+                    <div class="space-y-1.5 text-sm text-blue-700 dark:text-blue-300">
+                        <p>1. Go to <strong class="font-semibold text-blue-800 dark:text-blue-200">Projects → New Project</strong> and create a project for your store.</p>
+                        <p>2. Under <strong class="font-semibold text-blue-800 dark:text-blue-200">Project Settings → Runner</strong>, set the framework to <strong class="font-semibold text-blue-800 dark:text-blue-200">{{ $framework === 'cypress' ? 'Cypress' : 'Playwright' }}</strong> and the test directory to <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">{{ $framework === 'cypress' ? 'cypress/e2e' : 'tests/' }}</code>.</p>
+                        <p>3. Add your store URL as the <strong class="font-semibold text-blue-800 dark:text-blue-200">Base URL</strong> in the project configuration.</p>
+                        <p>4. Trigger a test run from the dashboard or connect your CI pipeline using the SignalDeck API token shown in project settings.</p>
+                        <p>5. Monitor results, screenshots, and failure reports from the <strong class="font-semibold text-blue-800 dark:text-blue-200">Test Runs</strong> view.</p>
+                    </div>
                 </div>
+
             </div>
         </div>
 

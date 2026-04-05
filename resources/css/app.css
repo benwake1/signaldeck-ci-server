@@ -1,7 +1,29 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 /* Cypress Dashboard — global styles */
 /* Filament handles most styling; this file is for any overrides */
+
+/* Step number badge used in test generator next-steps section */
+.step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 9999px;
+    background-color: #bfdbfe; /* blue-200 */
+    color: #1e40af; /* blue-800 */
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin-top: 0.125rem;
+}
+
+.dark .step-badge {
+    background-color: #1e40af; /* blue-800 */
+    color: #bfdbfe; /* blue-200 */
+}
 
 /* Alpine.js cloak — hide elements before Alpine initialises */
 [x-cloak] { display: none !important; }
