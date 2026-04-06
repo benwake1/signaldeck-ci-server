@@ -122,13 +122,13 @@
             <div class="px-4 py-4 space-y-5">
 
                 {{-- Section 1 --}}
-                <div>
-                    <p class="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">1 — Set up locally</p>
+                <div class="mb-2">
+                    <p class="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">Set up locally</p>
                     <div class="space-y-1.5 text-sm text-blue-700 dark:text-blue-300">
                         <p>1. Unzip and drop the folder into your repo root.</p>
                         <p>2. Run <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">npm install</code> inside the test folder.</p>
                         @if($framework === 'playwright')
-                        <p>3. Run <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">npm run install:browsers</code> to download Playwright's browser binaries.</p>
+                            <p>3. Run <code class="bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 px-1.5 py-0.5 rounded font-mono text-xs">npm run install:browsers</code> to download Playwright's browser binaries.</p>
                         @endif
                         <p>{{ $framework === 'playwright' ? '4' : '3' }}. Update selectors, product URLs, and test data to match your store.</p>
                         <p>{{ $framework === 'playwright' ? '5' : '4' }}. Review any commented-out sections (e.g. guest checkout order placement) before enabling them.</p>
@@ -139,9 +139,9 @@
                 <div class="border-t border-blue-200 dark:border-blue-800"></div>
 
                 {{-- Section 2 --}}
-                <div>
+                <div class="mt-2 mb-2">
                     <div class="flex items-center gap-3 mb-2">
-                        <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">2 — Connect to SignalDeck CI</p>
+                        <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">Connect to SignalDeck CI</p>
                         <a href="https://docs.signaldeck.tech/docs/guides/projects-and-suites" target="_blank"
                            class="inline-flex items-center gap-1 rounded border border-blue-300 dark:border-blue-700 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">
                             View docs ↗
@@ -153,6 +153,23 @@
                         <p>3. Add your store URL as the <strong class="font-semibold text-blue-800 dark:text-blue-200">Base URL</strong> in the project configuration.</p>
                         <p>4. Trigger a test run from the dashboard or connect your CI pipeline using the SignalDeck API token shown in project settings.</p>
                         <p>5. Monitor results, screenshots, and failure reports from the <strong class="font-semibold text-blue-800 dark:text-blue-200">Test Runs</strong> view.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-blue-200 dark:border-blue-800"></div>
+
+                {{-- Section 2 --}}
+                <div class="mt-2">
+                    <div class="flex items-center gap-3 mb-2">
+                        <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">Docs</p>
+                        <a href="https://docs.signaldeck.tech/docs/guides/projects-and-suites" target="_blank"
+                           class="inline-flex items-center gap-1 rounded border border-blue-300 dark:border-blue-700 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">
+                            View docs ↗
+                        </a>
+                    </div>
+                    <div class="space-y-1.5 text-sm text-blue-700 dark:text-blue-300">
+                        <p>We would strongly encourage you to review the SignalDeck CI docs <a href="https://docs.signaldeck.tech/docs/guides/projects-and-suites" target="_blank" class="inline-flex items-center gap-1 rounded border border-blue-300 dark:border-blue-700 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">View docs ↗</a></p>
+                        <p>In addition to the SignalDeck CI docs, there are also extremely details docs for both Cypress and Playwright.</p>
                     </div>
                 </div>
 
@@ -168,11 +185,11 @@
         Back
     </x-filament::button>
     <x-filament::button
-        wire:click="downloadZip"
-        wire:loading.attr="disabled"
-        wire:target="downloadZip"
-        icon="heroicon-o-arrow-down-tray"
-        icon-position="after"
+            wire:click="downloadZip"
+            wire:loading.attr="disabled"
+            wire:target="downloadZip"
+            icon="heroicon-o-arrow-down-tray"
+            icon-position="after"
     >
         <span wire:loading.remove wire:target="downloadZip">Download ZIP</span>
         <span wire:loading wire:target="downloadZip">Generating...</span>

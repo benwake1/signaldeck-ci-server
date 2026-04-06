@@ -1,5 +1,20 @@
 <x-filament-panels::page>
 
+    {{-- Colour utilities not included in Filament's pre-compiled CSS --}}
+    <style>
+        .bg-amber-50{background-color:#fffbeb}.bg-blue-50{background-color:#eff6ff}.bg-blue-100{background-color:#dbeafe}
+        .border-amber-200{border-color:#fde68a}.border-blue-200{border-color:#bfdbfe}.border-blue-300{border-color:#93c5fd}
+        .text-amber-500{color:#f59e0b}.text-amber-700{color:#b45309}.text-amber-800{color:#92400e}
+        .text-blue-500{color:#3b82f6}.text-blue-700{color:#1d4ed8}.text-blue-800{color:#1e40af}
+        .hover\:bg-blue-100:hover{background-color:#dbeafe}
+        .dark .dark\:bg-amber-950{background-color:#451a03}.dark .dark\:bg-blue-950{background-color:#172554}.dark .dark\:bg-blue-900{background-color:#1e3a8a}
+        .dark .dark\:border-amber-800{border-color:#92400e}.dark .dark\:border-blue-800{border-color:#1e40af}.dark .dark\:border-blue-700{border-color:#1d4ed8}
+        .dark .dark\:text-amber-200{color:#fde68a}.dark .dark\:text-amber-300{color:#fcd34d}
+        .dark .dark\:text-blue-200{color:#bfdbfe}.dark .dark\:text-blue-300{color:#93c5fd}
+        .dark .dark\:hover\:bg-blue-900:hover{background-color:#1e3a8a}
+        .dark\:bg-blue-900\/30{background-color:rgb(30 58 138/.3)}
+    </style>
+
     {{-- Step indicator --}}
     <div class="flex items-center justify-center gap-2 mb-8">
         @foreach(['Framework', 'Scenarios', 'Configuration', 'Download'] as $i => $label)
