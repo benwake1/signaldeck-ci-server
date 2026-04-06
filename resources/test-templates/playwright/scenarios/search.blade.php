@@ -4,8 +4,8 @@
 import { test, expect } from '@playwright/test';
 
 const searchSel = {!! json_encode($scenarioSelectors, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
-const homeSel   = {{ json_encode($selectors['homepage'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }};
-const productSel = {{ json_encode($selectors['product'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }};
+const homeSel   = {!! json_encode($selectors['homepage'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
+const productSel = {!! json_encode($selectors['product'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
 
 // Update with a search term that returns results in your store
 const searchTerm     = 'shirt';

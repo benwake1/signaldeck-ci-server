@@ -12,11 +12,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Services\TestGeneratorService;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TestGeneratorController extends Controller
 {
-    public function generate(Request $request, TestGeneratorService $service): StreamedResponse
+    public function generate(Request $request, TestGeneratorService $service): BinaryFileResponse
     {
         $validated = $request->validate([
             'framework'        => ['required', 'in:cypress,playwright'],

@@ -170,7 +170,9 @@ class TestGeneratorService
         }
 
         $content = view()->file($stubPath, $context)->render();
-        file_put_contents($outputPath, $content);
+        if (file_put_contents($outputPath, $content) === false) {
+            throw new \RuntimeException("Failed to write generated file: {$outputPath}");
+        }
     }
 
     private function createZip(string $tmpDir, string $framework): string
@@ -182,7 +184,10 @@ class TestGeneratorService
         }
 
         $zip = new ZipArchive;
-        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        $result = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($result !== true) {
+            throw new \RuntimeException("Failed to create ZIP archive (code: {$result})");
+        }
 
         $rootName = $framework === 'cypress' ? 'cypress-tests' : 'playwright-tests';
 

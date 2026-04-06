@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 
 const cartSel = {!! json_encode($scenarioSelectors, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
-const atcSel  = {{ json_encode($selectors['add_to_cart'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }};
+const atcSel  = {!! json_encode($selectors['add_to_cart'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
 
 const productUrl = '/simple-product.html';
 

@@ -43,7 +43,7 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 - **Multi-project** — each project maps to a separate Git repository with its own deploy key
 - **Test suites** — define spec patterns, branch overrides, and env vars per suite
 - **One-click test runs** — trigger tests from the admin UI, no CI pipeline required
-- **Live console output** — watch test output update in real time via Livewire polling
+- **Live console output** — watch test output update in real time via WebSockets (Laravel Reverb), with Livewire polling as a fallback
 - **Result parsing** — Mochawesome (Cypress) and Playwright JSON reports parsed into the database
 - **Playwright project discovery** — auto-detect available browsers/devices from `playwright.config.ts`
 - **Performance tuning** — admin-only parallel workers and retry overrides for Playwright suites

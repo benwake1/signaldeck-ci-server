@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 
 const atcSel = {!! json_encode($scenarioSelectors, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
-const homeSel = {{ json_encode($selectors['homepage'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }};
+const homeSel = {!! json_encode($selectors['homepage'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) !!};
 
 // Update this URL with a real simple product path
 const productUrl = '/simple-product.html';
