@@ -125,7 +125,11 @@ class RunCypressTestJob implements ShouldQueue
         $browser = $this->resolveChromiumBinary();
         $browserFlag = $browser ? '--browser ' . escapeshellarg($browser) : '';
         $configFlags = '--config experimentalMemoryManagement=true,numTestsKeptInMemory=0,videoCompression=20';
-        $cmd = 'cd ' . escapeshellarg($this->runPath) . " && {$envString} npx cypress run --spec " . escapeshellarg($specPattern) . " {$reporterFlags} {$configFlags} {$browserFlag} 2>&1";
+        // xvfb-run is required on headless Linux (Docker). On macOS (local dev) it
+        // doesn't exist, so we detect it at runtime and omit the prefix there.
+        $xvfb = trim((string) shell_exec('which xvfb-run 2>/dev/null'));
+        $xvfbPrefix = $xvfb ? "xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' " : '';
+        $cmd = 'cd ' . escapeshellarg($this->runPath) . " && {$xvfbPrefix}{$envString} npx cypress run --spec " . escapeshellarg($specPattern) . " {$reporterFlags} {$configFlags} {$browserFlag} 2>&1";
 
         $this->log("🧪 Running Cypress tests...");
         $this->log("   Spec pattern: {$specPattern}");
