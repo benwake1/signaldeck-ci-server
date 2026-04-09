@@ -62,6 +62,9 @@ echo "▶ Setting app version from git tag..."
 APP_VERSION="${APP_VERSION:-$(run_as git describe --tags --abbrev=0 2>/dev/null || echo "dev")}"
 run_as sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env
 
+echo "▶ Clearing stale caches..."
+run_as ${PHP} artisan optimize:clear
+
 echo "▶ Caching config, routes and views..."
 run_as ${PHP} artisan config:cache
 run_as ${PHP} artisan route:cache
