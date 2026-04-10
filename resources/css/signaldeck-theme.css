@@ -40,6 +40,29 @@
         color: #fff;
     }
 
+    /* ── Custom Blade view gray overrides ──────────────────────────────────
+     * Pages like test-generator and slack-settings are hand-rolled Blade
+     * views that use raw Tailwind dark: utilities (dark:bg-gray-900, etc.)
+     * instead of Filament component classes. Tailwind's palette maps those
+     * to neutral grays which clash with SignalDeck's navy/teal.
+     *
+     * These rules sit EARLY so that every specific .fi-* override further
+     * down still wins for any Filament element that carries the same class
+     * (e.g. fi-sidebar also has dark:bg-gray-900 in its template).
+     * ─────────────────────────────────────────────────────────────────── */
+    & .dark\:bg-gray-900     { background-color: #0e1d30 !important; }
+    & .dark\:bg-gray-800     { background-color: rgba(8, 17, 30, 0.85) !important; }
+    & .dark\:border-gray-700 { border-color: #315675 !important; }
+    & .dark\:border-gray-600 { border-color: rgba(49, 86, 117, 0.65) !important; }
+    & .dark\:border-gray-800 { border-color: rgba(49, 86, 117, 0.35) !important; }
+
+    /* Text colour overrides — Tailwind's dark: palette renders dim grays on the navy bg */
+    & .dark\:text-gray-100 { color: #f0f9ff !important; }
+    & .dark\:text-gray-200 { color: #e2f6ff !important; }
+    & .dark\:text-gray-300 { color: #cde8f5 !important; }
+    & .dark\:text-gray-400 { color: #9db3c5 !important; }
+    & .dark\:text-gray-500 { color: #9db3c5 !important; }
+
     /* ── Base layout ────────────────────────────────────────────────────── */
     & .fi-layout {
         background-color: transparent;
@@ -154,23 +177,38 @@
      * to avoid double-border / nested-box artifacts.
      * ─────────────────────────────────────────────────────────────────────── */
     & .fi-section,
-    & .fi-ta-ctn,
-    & .fi-wi-stats-overview-stat {
+    & .fi-ta-ctn {
         background-color: #0e1d30 !important;
+        --tw-ring-color: rgba(49, 86, 117, 0.6) !important;
         --tw-ring-offset-shadow: 0 0 #0000 !important;
-        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-ring-shadow: 0 0 0 1px rgba(49, 86, 117, 0.6) !important;
         --tw-shadow: 0 0 #0000 !important;
         --tw-shadow-colored: 0 0 #0000 !important;
         box-shadow: 0 0 0 1px rgba(49, 86, 117, 0.6) !important;
     }
 
-    & .fi-section:hover,
-    & .fi-wi-stats-overview-stat:hover {
+    & .fi-section:hover {
+        --tw-ring-color: rgba(57, 213, 255, 0.35) !important;
         --tw-ring-offset-shadow: 0 0 #0000 !important;
-        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-ring-shadow: 0 0 0 1px rgba(57, 213, 255, 0.35) !important;
         --tw-shadow: 0 0 #0000 !important;
         box-shadow: 0 0 0 1px rgba(57, 213, 255, 0.35) !important;
         transition: box-shadow 0.2s ease;
+    }
+
+    /* Stats overview stat cards — use border directly to avoid ring/shadow cascade conflicts */
+    & .fi-wi-stats-overview-stat {
+        background-color: #0e1d30 !important;
+        border: 1px solid rgba(49, 86, 117, 0.6) !important;
+        box-shadow: none !important;
+        outline: none !important;
+        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-shadow: 0 0 #0000 !important;
+    }
+
+    & .fi-wi-stats-overview-stat:hover {
+        border-color: rgba(57, 213, 255, 0.35) !important;
+        transition: border-color 0.2s ease;
     }
 
     /* Stats overview wrapper — transparent so individual stat cards show through cleanly */
@@ -190,6 +228,19 @@
     & .fi-wi-stats-overview-stat-value { color: #fff !important; }
     & .fi-wi-stats-overview-stat-label { color: #9db3c5 !important; }
     & .fi-wi-stats-overview-stat-description { color: #9db3c5 !important; }
+
+    /* Widget / section body text — Filament uses text-gray-500 dark:text-gray-400 for muted text */
+    & .fi-wi-chart-heading,
+    & .fi-section-content p,
+    & .fi-wi p {
+        color: #cde8f5 !important;
+    }
+
+    /* Generic muted text utility used inside Filament components and custom widgets */
+    & .text-gray-400 { color: #9db3c5 !important; }
+    & .text-gray-500 { color: #9db3c5 !important; }
+    & .text-gray-600 { color: #9db3c5 !important; }
+    & .text-gray-700 { color: #cde8f5 !important; }
 
     /* ── Tables ─────────────────────────────────────────────────────────── */
     /* Target the whole header row so empty th cells (e.g. actions column) match */
@@ -259,17 +310,27 @@
         border-color: rgba(49, 86, 117, 0.5) !important;
     }
 
-    & .fi-button {
-        background-color: #39d5ff;
-        color: #222222;
-    }
-
-    & .fi-btn-color-success, & .fi-btn-color-danger, & .fi-btn-color-gray {
+    /* ── Buttons ────────────────────────────────────────────────────────────
+     * Filament v3 uses fi-btn (not fi-button) as the base class.
+     * Text is set to white across all colored variants so it reads against
+     * both the brand cyan primary and any danger/success/warning backgrounds.
+     * ─────────────────────────────────────────────────────────────────────── */
+    & .fi-btn-color-primary,
+    & .fi-btn-color-danger,
+    & .fi-btn-color-success,
+    & .fi-btn-color-warning,
+    & .fi-btn-color-gray,
+    & .fi-ac-btn-action {
         color: #ffffff !important;
     }
 
-    & .fi-ac-btn-action, & .fi-color-custom.fi-btn-color-primary.fi-color-primary {
-        color: #222222;
+    & .fi-btn-color-primary svg,
+    & .fi-btn-color-danger svg,
+    & .fi-btn-color-success svg,
+    & .fi-btn-color-warning svg,
+    & .fi-btn-color-gray svg,
+    & .fi-ac-btn-action svg {
+        color: #ffffff !important;
     }
 
     /* Login */
