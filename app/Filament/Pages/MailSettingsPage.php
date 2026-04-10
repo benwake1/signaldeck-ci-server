@@ -143,10 +143,10 @@ class MailSettingsPage extends Page
 
         try {
             Mail::raw(
-                'This is a test email from your Cypress Dashboard to confirm mail settings are working correctly.',
+                'This is a test email from your SignalDeck CI instance to confirm mail settings are working correctly.',
                 function ($message) use ($user) {
                     $message->to($user->email)
-                            ->subject('Cypress Dashboard — Mail Configuration Test');
+                            ->subject('SignalDeck CI — Mail Configuration Test');
                 }
             );
 

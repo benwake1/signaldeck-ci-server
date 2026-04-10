@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Cypress Dashboard — Install on Existing LEMP Stack
+# SignalDeck CI — Install on Existing LEMP Stack
 # For servers that already have Nginx, MySQL, PHP and Node running.
 # Adds the app alongside your existing sites without touching their config.
 # All names, paths and ports are configurable — safe to run multiple instances.
@@ -152,7 +152,7 @@ success "All prerequisites met."
 # -----------------------------------------------------------------------------
 header "Configuration"
 
-echo -e "${BOLD}This will add Cypress Dashboard alongside your existing sites.${NC}"
+echo -e "${BOLD}This will add SignalDeck CI alongside your existing sites.${NC}"
 echo -e "No existing Nginx configs, databases, or users will be modified."
 echo -e "Press Enter to accept the default shown in [brackets].\n"
 
@@ -415,7 +415,7 @@ else
 
     info "Writing production .env values..."
     sudo -u "${APP_USER}" bash -c "cat > ${APP_DIR}/.env" <<EOF
-APP_NAME="Cypress Dashboard"
+APP_NAME="SignalDeck CI"
 APP_ENV=production
 APP_KEY=
 APP_DEBUG=false
@@ -470,7 +470,7 @@ MAIL_USERNAME=
 MAIL_PASSWORD=
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=
-MAIL_FROM_NAME="Cypress Dashboard"
+MAIL_FROM_NAME="SignalDeck CI"
 
 # Node binary paths — update if different on this server
 NODE_PATH=$(which node)
@@ -694,7 +694,7 @@ success "Cron registered for user '${APP_USER}'."
 # -----------------------------------------------------------------------------
 header "Installation complete!"
 
-echo -e "${GREEN}${BOLD}✔ Cypress Dashboard '${INSTANCE_NAME}' has been added to your server.${NC}\n"
+echo -e "${GREEN}${BOLD}✔ SignalDeck CI '${INSTANCE_NAME}' has been added to your server.${NC}\n"
 echo -e "${BOLD}Your existing sites, databases, and services have not been modified.${NC}\n"
 
 # Show SSL-specific follow-up steps

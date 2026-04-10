@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @variant dark (&:where(.dark, .dark *));
 
-/* Cypress Dashboard — global styles */
+/* SignalDeck CI — global styles */
 /* Filament handles most styling; this file is for any overrides */
 
 /* Step number badge used in test generator next-steps section */

@@ -167,7 +167,7 @@ Copy `.env.example` to `.env` and fill in the values below.
 ### Application
 
 ```env
-APP_NAME="Cypress Dashboard"
+APP_NAME=SignalDeck CI"
 APP_ENV=local                    # local | production
 APP_KEY=                         # Set automatically by php artisan key:generate
 APP_DEBUG=true                   # Set to false in production
@@ -1263,10 +1263,10 @@ git status
 git add .
 
 # Initial commit
-git commit -m "Initial commit: Cypress Dashboard"
+git commit -m "Initial commit: SignalDeck CI"
 
 # Add your remote
-git remote add origin git@github.com:your-org/cypress-dashboard.git
+git remote add origin git@github.com:your-org/signaldeck-ci-server.git
 
 # Push
 git push -u origin main
