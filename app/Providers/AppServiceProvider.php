@@ -38,6 +38,11 @@ class AppServiceProvider extends ServiceProvider
 
     private function applyMailSettings(): void
     {
+        // Hosted instances use mail configured at the server level via .env
+        if (config('brand.is_hosted')) {
+            return;
+        }
+
         try {
             $map = [
                 'mail_mailer'       => 'mail.default',

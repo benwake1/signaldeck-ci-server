@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sd-panel" x1="96" y1="88" x2="416" y2="424" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16324A"/>
+      <stop offset="1" stop-color="#0B1728"/>
+    </linearGradient>
+    <linearGradient id="sd-bars" x1="172" y1="192" x2="332" y2="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#39D5FF"/>
+      <stop offset="1" stop-color="#7FF7B8"/>
+    </linearGradient>
+    <linearGradient id="sd-check" x1="214" y1="218" x2="365" y2="332" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EAF6FF"/>
+      <stop offset="1" stop-color="#7BF6E8"/>
+    </linearGradient>
+    <filter id="sd-shadow" x="72" y="84" width="368" height="348" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#08111E" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#sd-shadow)">
+    <rect x="96" y="104" width="320" height="304" rx="72" fill="url(#sd-panel)"/>
+    <rect x="118" y="126" width="276" height="260" rx="54" stroke="#315675" stroke-width="4"/>
+  </g>
+
+  <circle cx="164" cy="167" r="11" fill="#39D5FF"/>
+  <circle cx="196" cy="167" r="11" fill="#7BF6E8" opacity="0.72"/>
+  <circle cx="228" cy="167" r="11" fill="#7FF7B8" opacity="0.5"/>
+
+  <rect x="152" y="285" width="42" height="59" rx="21" fill="url(#sd-bars)"/>
+  <rect x="214" y="236" width="42" height="108" rx="21" fill="url(#sd-bars)"/>
+  <rect x="276" y="193" width="42" height="151" rx="21" fill="url(#sd-bars)"/>
+
+  <path d="M254 287L287 320L361 241" stroke="url(#sd-check)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

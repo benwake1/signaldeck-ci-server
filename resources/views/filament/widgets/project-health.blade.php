@@ -14,7 +14,7 @@
                     };
                 @endphp
 
-                <div class="rounded-xl border-2 p-4
+                <div class="rounded-xl border-2 p-4 fi-health-block
                     @if($colour === 'green') border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950
                     @elseif($colour === 'red') border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950
                     @elseif($colour === 'yellow') border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950
@@ -61,7 +61,7 @@
                         @foreach($project['suites'] as $suite)
                             <button
                                 wire:click="triggerRun({{ $project['id'] }}, {{ $suite->id }})"
-                                class="text-xs px-2 py-1 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                                class="text-xs px-2 py-1 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition fi-button"
                             >
                                 ▶ {{ $suite->name }}
                             </button>

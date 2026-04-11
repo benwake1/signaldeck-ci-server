@@ -74,6 +74,11 @@ class SendTestRunCompletedEmail implements ShouldQueue
 
     private function applyMailSettings(): void
     {
+        // Hosted instances use mail configured at the server level via .env
+        if (config('brand.is_hosted')) {
+            return;
+        }
+
         $map = [
             'mail_mailer'       => 'mail.default',
             'mail_from_address' => 'mail.from.address',

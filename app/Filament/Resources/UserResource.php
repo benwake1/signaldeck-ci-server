@@ -30,37 +30,39 @@ class UserResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')
-                ->required()
-                ->maxLength(255),
+            Forms\Components\Section::make()->schema([
+                Forms\Components\TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
 
-            Forms\Components\TextInput::make('email')
-                ->email()
-                ->required()
-                ->unique(ignoreRecord: true)
-                ->maxLength(255),
+                Forms\Components\TextInput::make('email')
+                    ->email()
+                    ->required()
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255),
 
-            Forms\Components\Select::make('role')
-                ->options([
-                    'admin' => 'Admin',
-                    'pm'    => 'Project Manager',
-                ])
-                ->required()
-                ->default('pm'),
+                Forms\Components\Select::make('role')
+                    ->options([
+                        'admin' => 'Admin',
+                        'pm'    => 'Project Manager',
+                    ])
+                    ->required()
+                    ->default('pm'),
 
-            Forms\Components\TextInput::make('password')
-                ->password()
-                ->revealable()
-                ->dehydrateStateUsing(fn ($state) => filled($state) ? bcrypt($state) : null)
-                ->dehydrated(fn ($state) => filled($state))
-                ->required(fn (string $operation) => $operation === 'create')
-                ->helperText(fn (string $operation) => $operation === 'edit' ? 'Leave blank to keep current password.' : null),
+                Forms\Components\TextInput::make('password')
+                    ->password()
+                    ->revealable()
+                    ->dehydrateStateUsing(fn ($state) => filled($state) ? bcrypt($state) : null)
+                    ->dehydrated(fn ($state) => filled($state))
+                    ->required(fn (string $operation) => $operation === 'create')
+                    ->helperText(fn (string $operation) => $operation === 'edit' ? 'Leave blank to keep current password.' : null),
 
-            Forms\Components\TextInput::make('slack_user_id')
-                ->label('Slack User ID')
-                ->placeholder('U12345ABCDE')
-                ->helperText('Optional. Leave blank to auto-resolve from the user\'s email address. Format: U followed by alphanumeric characters.')
-                ->nullable(),
+                Forms\Components\TextInput::make('slack_user_id')
+                    ->label('Slack User ID')
+                    ->placeholder('U12345ABCDE')
+                    ->helperText('Optional. Leave blank to auto-resolve from the user\'s email address. Format: U followed by alphanumeric characters.')
+                    ->nullable(),
+            ])->columns(2),
         ]);
     }
 

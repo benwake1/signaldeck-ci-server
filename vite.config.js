@@ -6,7 +6,7 @@ export default defineConfig({
     plugins: [
         tailwindcss(),
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/css/report.css'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/css/report.css', 'resources/css/signaldeck-theme.css', 'resources/css/filament-utilities.css'],
             refresh: true,
         }),
     ],

@@ -34,7 +34,7 @@
         @endif
 
         {{-- Status Bar --}}
-        <div class="rounded-xl border p-4 flex items-center justify-between"
+        <div class="sd-block-transparent rounded-xl border p-4 flex items-center justify-between"
              :style="{
                 borderColor: status === 'passing'                                         ? '#86efac' :
                              status === 'failed' || status === 'error'                    ? '#fca5a5' :
@@ -78,12 +78,12 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {{-- Live Log --}}
-            <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div class="bg-gray-900 px-4 py-2 flex items-center justify-between">
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden sd-block">
+                <div class="bg-gray-900 px-4 py-2 flex items-center justify-between sd-block">
                     <span class="text-xs text-gray-400 font-mono">Console Output</span>
                     <div x-show="isRunning" class="flex items-center gap-1">
                         <span class="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                        <span class="text-xs text-green-400">Live</span>
+                        <span class="text-xs text-green-400 sd-block-green">Live</span>
                     </div>
                 </div>
                 <div
@@ -135,8 +135,8 @@
             </div>
 
             {{-- Test Results --}}
-            <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div class="bg-white dark:bg-gray-800 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div class="rounded-xl border border-dark-900 overflow-hidden sd-block">
+                <div class="bg-white dark:bg-gray-800 px-4 py-3 border-b border-blue-200 dark:border-gray-700 fi-border-title sd-block">
                     <h3 class="font-semibold text-sm">Test Results</h3>
                 </div>
                 <div class="divide-y divide-gray-100 dark:divide-gray-700 max-h-96 overflow-y-auto" id="results-container">
@@ -208,8 +208,8 @@
 
         {{-- Failed Tests Detail --}}
         @if($record->testResults->where('status', 'failed')->count() > 0)
-        <div class="mt-6 rounded-xl border border-red-200 dark:border-red-800 overflow-hidden">
-            <div class="bg-red-50 dark:bg-red-950 px-4 py-3 border-b border-red-200 dark:border-red-800">
+        <div class="mt-6 rounded-xl border border-red-200 dark:border-red-800 overflow-hidden sd-block-transparent">
+            <div class="bg-red-50 dark:bg-red-950 px-4 py-3 border-b border-red-200 dark:border-red-800 sd-block-transparent">
                 <h3 class="font-semibold text-sm text-red-800 dark:text-red-200">
                     ❌ {{ $record->testResults->where('status', 'failed')->count() }} Failed Test(s)
                 </h3>
@@ -277,19 +277,19 @@
 
         {{-- Run Metadata --}}
         <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800">
+            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800 sd-block">
                 <p class="text-xs text-gray-500">Client</p>
                 <p class="font-medium text-sm">{{ $record->project->client->name }}</p>
             </div>
-            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800">
+            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800 sd-block">
                 <p class="text-xs text-gray-500">Triggered By</p>
                 <p class="font-medium text-sm">{{ $record->triggeredBy->name }}</p>
             </div>
-            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800">
+            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800 sd-block">
                 <p class="text-xs text-gray-500">Commit SHA</p>
                 <p class="font-medium text-sm font-mono">{{ $record->commit_sha ?? '—' }}</p>
             </div>
-            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800">
+            <div class="rounded-lg border p-3 bg-white dark:bg-gray-800 sd-block">
                 <p class="text-xs text-gray-500">Started</p>
                 <p class="font-medium text-sm">{{ $record->started_at?->diffForHumans() ?? '—' }}</p>
             </div>

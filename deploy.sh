@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================
-#  Cypress Dashboard — Post-deployment script
+#  SignalDeck CI — Post-deployment script
 #  Runs on the server after each successful push to main.
 #  Works from any install directory — resolves its own location.
 # =============================================================
@@ -61,6 +61,9 @@ fi
 echo "▶ Setting app version from git tag..."
 APP_VERSION="${APP_VERSION:-$(run_as git describe --tags --abbrev=0 2>/dev/null || echo "dev")}"
 run_as sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env
+
+echo "▶ Clearing stale caches..."
+run_as ${PHP} artisan optimize:clear
 
 echo "▶ Caching config, routes and views..."
 run_as ${PHP} artisan config:cache

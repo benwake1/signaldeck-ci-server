@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Cypress Dashboard — Production Install Script
+# SignalDeck CI — Production Install Script
 # Ubuntu 24.04 LTS + Nginx + MySQL + Supervisor + Cloudflare
 # Safe to re-run at any point — all steps are idempotent.
 # =============================================================================
@@ -33,9 +33,9 @@ fi
 # -----------------------------------------------------------------------------
 # Gather inputs up front
 # -----------------------------------------------------------------------------
-header "Cypress Dashboard Installer"
+header "SignalDeck CI Installer"
 
-echo -e "${BOLD}This script will install and configure Cypress Dashboard on this server.${NC}"
+echo -e "${BOLD}This script will install and configure SignalDeck CI on this server.${NC}"
 echo -e "It is safe to re-run if a previous attempt failed.\n"
 echo -e "You will need your ${BOLD}domain name${NC} and a ${BOLD}database password${NC} ready.\n"
 
@@ -270,7 +270,7 @@ else
 
     info "Writing production .env values..."
     sudo -u "${APP_USER}" bash -c "cat > ${APP_DIR}/.env" <<EOF
-APP_NAME="Cypress Dashboard"
+APP_NAME="SignalDeck CI"
 APP_ENV=production
 APP_KEY=
 APP_DEBUG=false
@@ -330,7 +330,7 @@ MAIL_USERNAME=
 MAIL_PASSWORD=
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=
-MAIL_FROM_NAME="Cypress Dashboard"
+MAIL_FROM_NAME="SignalDeck CI"
 
 # Node binary paths — update if different on this server
 NODE_PATH=$(which node)
@@ -504,7 +504,7 @@ success "Cron registered."
 # -----------------------------------------------------------------------------
 header "Installation complete!"
 
-echo -e "${GREEN}${BOLD}✔ Cypress Dashboard is installed.${NC}\n"
+echo -e "${GREEN}${BOLD}✔ SignalDeck CI is installed.${NC}\n"
 echo -e "${BOLD}Manual steps still required:${NC}\n"
 
 echo -e "${YELLOW}1. Cloudflare Origin Certificate${NC}"

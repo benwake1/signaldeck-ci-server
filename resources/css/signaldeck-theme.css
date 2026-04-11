@@ -1,0 +1,369 @@
+/* ── SignalDeck Hosted Theme ──────────────────────────────────────────────
+ * Loaded only when IS_HOSTED=true via a HEAD_END render hook <link> tag.
+ * Completely separate from Filament's stylesheet — zero risk of breakage.
+ *
+ * Body gets class `signaldeck-hosted` via BODY_START render hook script.
+ * CSS variables --brand-primary / --brand-secondary injected into :root
+ * via HEAD_END render hook in AdminPanelProvider.
+ *
+ * Colour tokens from signaldeck.tech:
+ *   Dark bg:    #08111e   Dark card:  #0e1d30
+ *   Dark raised:#16324a   Border:     #315675
+ *   Accent:     #39d5ff   Muted:      #9db3c5
+ * ─────────────────────────────────────────────────────────────────────── */
+
+.signaldeck-hosted {
+    background-color: #08111e !important;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 0) !important;
+    background-size: 28px 28px !important;
+    color-scheme: dark;
+    font-family: 'Inter', system-ui, sans-serif;
+
+    /* ── Fonts ──────────────────────────────────────────────────────────── */
+    & input,
+    & select,
+    & textarea,
+    & button {
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    & code,
+    & pre,
+    & kbd,
+    & #log-container {
+        font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+    }
+
+    /* ── Selection ──────────────────────────────────────────────────────── */
+    & ::selection {
+        background-color: rgba(57, 213, 255, 0.2);
+        color: #fff;
+    }
+
+    /* ── Custom Blade view gray overrides ──────────────────────────────────
+     * Pages like test-generator and slack-settings are hand-rolled Blade
+     * views that use raw Tailwind dark: utilities (dark:bg-gray-900, etc.)
+     * instead of Filament component classes. Tailwind's palette maps those
+     * to neutral grays which clash with SignalDeck's navy/teal.
+     *
+     * These rules sit EARLY so that every specific .fi-* override further
+     * down still wins for any Filament element that carries the same class
+     * (e.g. fi-sidebar also has dark:bg-gray-900 in its template).
+     * ─────────────────────────────────────────────────────────────────── */
+    & .dark\:bg-gray-900     { background-color: #0e1d30 !important; }
+    & .dark\:bg-gray-800     { background-color: rgba(8, 17, 30, 0.85) !important; }
+    & .dark\:border-gray-700 { border-color: #315675 !important; }
+    & .dark\:border-gray-600 { border-color: rgba(49, 86, 117, 0.65) !important; }
+    & .dark\:border-gray-800 { border-color: rgba(49, 86, 117, 0.35) !important; }
+
+    /* Text colour overrides — Tailwind's dark: palette renders dim grays on the navy bg */
+    & .dark\:text-gray-100 { color: #f0f9ff !important; }
+    & .dark\:text-gray-200 { color: #e2f6ff !important; }
+    & .dark\:text-gray-300 { color: #cde8f5 !important; }
+    & .dark\:text-gray-400 { color: #9db3c5 !important; }
+    & .dark\:text-gray-500 { color: #9db3c5 !important; }
+
+    /* ── Base layout ────────────────────────────────────────────────────── */
+    & .fi-layout {
+        background-color: transparent;
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────────────────── */
+    & .fi-sidebar,
+    & .fi-sidebar.lg\:bg-transparent {
+        background-color: #0a1929 !important;
+        border-right: 1px solid #315675 !important;
+    }
+
+    & .fi-sidebar-header {
+        background-color: #0a1929 !important;
+        border-bottom: 1px solid #315675 !important;
+        --tw-ring-color: transparent !important;
+        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-shadow: 0 0 #0000 !important;
+        box-shadow: none !important;
+    }
+
+    & .fi-sidebar-nav {
+        background-color: #0a1929 !important;
+    }
+
+    & .fi-sidebar-group-label {
+        color: rgba(157, 179, 197, 0.5) !important;
+        font-size: 0.65rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.1em !important;
+        text-transform: uppercase !important;
+    }
+
+    & .fi-sidebar-group + .fi-sidebar-group {
+        border-top: 1px solid rgba(49, 86, 117, 0.4);
+        padding-top: 1.5rem;
+    }
+
+    & .fi-sidebar-item-button {
+        color: #9db3c5 !important;
+        border-radius: 0.5rem !important;
+        transition: background-color 0.15s, color 0.15s !important;
+
+        &:hover {
+            background-color: rgba(57, 213, 255, 0.08) !important;
+            color: #e2f6ff !important;
+        }
+    }
+
+    & .fi-sidebar-item.fi-active .fi-sidebar-item-button {
+        background-color: rgba(57, 213, 255, 0.14) !important;
+        color: var(--brand-primary, #39d5ff) !important;
+        box-shadow: inset 3px 0 0 var(--brand-primary, #39d5ff) !important;
+    }
+
+    & .fi-sidebar-close-overlay {
+        background-color: rgba(8, 17, 30, 0.85) !important;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────────────────────── */
+    & .fi-topbar nav {
+        position: relative;
+        overflow: hidden;
+        background-color: #0a1929 !important;
+        border-bottom: 1px solid #315675 !important;
+        --tw-ring-color: transparent !important;
+        --tw-shadow: none !important;
+        box-shadow: none !important;
+
+        &::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 80% 200% at 50% -60%, rgba(57, 213, 255, 0.15), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        & > * {
+            position: relative;
+            z-index: 1;
+        }
+    }
+
+    /* ── Main content ───────────────────────────────────────────────────── */
+    & .fi-main-ctn {
+        background-color: transparent !important;
+
+        &::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 400px;
+            background: radial-gradient(ellipse 60% 300px at 60% 0px, rgba(57, 213, 255, 0.06), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+    }
+
+    & .fi-main {
+        background-color: transparent !important;
+    }
+
+    /* ── Cards / sections / widgets ─────────────────────────────────────────
+     * Filament uses Tailwind's ring utilities (ring-1 ring-gray-950/5 dark:ring-white/10)
+     * which compile into box-shadow via --tw-ring-shadow. We must zero out all three
+     * ring/shadow vars AND set box-shadow in the same rule to prevent re-composition.
+     *
+     * Target only the actual card elements, NOT their parent wrappers (.fi-wi),
+     * to avoid double-border / nested-box artifacts.
+     * ─────────────────────────────────────────────────────────────────────── */
+    & .fi-section,
+    & .fi-ta-ctn {
+        background-color: #0e1d30 !important;
+        --tw-ring-color: rgba(49, 86, 117, 0.6) !important;
+        --tw-ring-offset-shadow: 0 0 #0000 !important;
+        --tw-ring-shadow: 0 0 0 1px rgba(49, 86, 117, 0.6) !important;
+        --tw-shadow: 0 0 #0000 !important;
+        --tw-shadow-colored: 0 0 #0000 !important;
+        box-shadow: 0 0 0 1px rgba(49, 86, 117, 0.6) !important;
+    }
+
+    & .fi-section:hover {
+        --tw-ring-color: rgba(57, 213, 255, 0.35) !important;
+        --tw-ring-offset-shadow: 0 0 #0000 !important;
+        --tw-ring-shadow: 0 0 0 1px rgba(57, 213, 255, 0.35) !important;
+        --tw-shadow: 0 0 #0000 !important;
+        box-shadow: 0 0 0 1px rgba(57, 213, 255, 0.35) !important;
+        transition: box-shadow 0.2s ease;
+    }
+
+    /* Stats overview stat cards — use border directly to avoid ring/shadow cascade conflicts */
+    & .fi-wi-stats-overview-stat {
+        background-color: #0e1d30 !important;
+        border: 1px solid rgba(49, 86, 117, 0.6) !important;
+        box-shadow: none !important;
+        outline: none !important;
+        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-shadow: 0 0 #0000 !important;
+    }
+
+    & .fi-wi-stats-overview-stat:hover {
+        border-color: rgba(57, 213, 255, 0.35) !important;
+        transition: border-color 0.2s ease;
+    }
+
+    /* Stats overview wrapper — transparent so individual stat cards show through cleanly */
+    & .fi-wi-stats-overview {
+        --tw-ring-offset-shadow: 0 0 #0000 !important;
+        --tw-ring-shadow: 0 0 #0000 !important;
+        --tw-shadow: 0 0 #0000 !important;
+        box-shadow: none !important;
+        background-color: transparent !important;
+    }
+
+    & .fi-section-header {
+        border-bottom-color: #315675 !important;
+    }
+
+    /* ── Stats widgets ──────────────────────────────────────────────────── */
+    & .fi-wi-stats-overview-stat-value { color: #fff !important; }
+    & .fi-wi-stats-overview-stat-label { color: #9db3c5 !important; }
+    & .fi-wi-stats-overview-stat-description { color: #9db3c5 !important; }
+
+    /* Widget / section body text — Filament uses text-gray-500 dark:text-gray-400 for muted text */
+    & .fi-wi-chart-heading,
+    & .fi-section-content p,
+    & .fi-wi p {
+        color: #cde8f5 !important;
+    }
+
+    /* Generic muted text utility used inside Filament components and custom widgets */
+    & .text-gray-400 { color: #9db3c5 !important; }
+    & .text-gray-500 { color: #9db3c5 !important; }
+    & .text-gray-600 { color: #9db3c5 !important; }
+    & .text-gray-700 { color: #cde8f5 !important; }
+
+    /* ── Tables ─────────────────────────────────────────────────────────── */
+    /* Target the whole header row so empty th cells (e.g. actions column) match */
+    & .fi-ta thead tr th {
+        background-color: rgba(14, 29, 48, 0.8) !important;
+        border-bottom: 1px solid #315675 !important;
+    }
+
+    & .fi-ta-header-cell {
+        background-color: rgba(14, 29, 48, 0.8) !important;
+        color: rgba(157, 179, 197, 0.8) !important;
+        border-bottom: 1px solid #315675 !important;
+        font-size: 0.7rem !important;
+        letter-spacing: 0.06em !important;
+        text-transform: uppercase !important;
+    }
+
+    & .fi-ta-cell {
+        border-bottom-color: rgba(49, 86, 117, 0.35) !important;
+    }
+
+    & .fi-ta-row:hover .fi-ta-cell {
+        background-color: rgba(57, 213, 255, 0.04) !important;
+    }
+
+    /* ── Form inputs ────────────────────────────────────────────────────── */
+    & .fi-input-wrp {
+        background-color: rgba(8, 17, 30, 0.8) !important;
+        border-color: #315675 !important;
+
+        &:focus-within {
+            border-color: var(--brand-primary, #39d5ff) !important;
+        }
+    }
+
+    & .fi-select-input,
+    & .fi-input {
+        background-color: transparent !important;
+        color: #e2f6ff !important;
+    }
+
+    /* ── Dropdowns ──────────────────────────────────────────────────────── */
+    & .fi-dropdown-panel {
+        background-color: #0e1d30 !important;
+        border: 1px solid #315675 !important;
+        box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.7) !important;
+        --tw-shadow: none !important;
+    }
+
+    & .fi-dropdown-list-item-label { color: #9db3c5 !important; }
+    & .fi-dropdown-list-item:hover {
+        background-color: rgba(57, 213, 255, 0.08) !important;
+        color: #e2f6ff !important;
+    }
+
+    /* ── Page header ────────────────────────────────────────────────────── */
+    & .fi-header {
+        border-bottom-color: rgba(49, 86, 117, 0.5) !important;
+    }
+
+    & .fi-header-heading { color: #fff !important; }
+    & .fi-breadcrumbs-item { color: #9db3c5 !important; }
+
+    /* ── Misc ───────────────────────────────────────────────────────────── */
+    & hr,
+    & [class*="divide-"] > * + * {
+        border-color: rgba(49, 86, 117, 0.5) !important;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────────
+     * Filament v3 uses fi-btn (not fi-button) as the base class.
+     * Text is set to white across all colored variants so it reads against
+     * both the brand cyan primary and any danger/success/warning backgrounds.
+     * ─────────────────────────────────────────────────────────────────────── */
+    & .fi-btn-color-primary,
+    & .fi-btn-color-danger,
+    & .fi-btn-color-success,
+    & .fi-btn-color-warning,
+    & .fi-btn-color-gray,
+    & .fi-ac-btn-action {
+        color: #ffffff !important;
+    }
+
+    & .fi-btn-color-primary svg,
+    & .fi-btn-color-danger svg,
+    & .fi-btn-color-success svg,
+    & .fi-btn-color-warning svg,
+    & .fi-btn-color-gray svg,
+    & .fi-ac-btn-action svg {
+        color: #ffffff !important;
+    }
+
+    /* Login */
+
+    & .fi-simple-main, & .fi-simple-layout, & .fi-health-block {
+        background: radial-gradient(ellipse 60% 300px at 60% 0px, rgba(57, 213, 255, 0.06), transparent 70%)
+    }
+
+    & .sd-block {
+        background-color: #0e1d30 !important;
+        border: 1px solid #315675 !important;
+        box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.7) !important;
+        --tw-shadow: none !important;
+        overflow: hidden;
+    }
+
+    & .sd-block-transparent {
+        background-color: #0e1d30 !important;
+        box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.7) !important;
+        --tw-shadow: none !important;
+        overflow: hidden;
+    }
+
+    .sd-error {
+        border-color: transparent;
+    }
+
+    & .sd-block-green {
+        color: #00bb00 !important;
+    }
+
+    & [x-html="logHtml"] {
+        color: #ffffff !important;
+    }
+}
+
