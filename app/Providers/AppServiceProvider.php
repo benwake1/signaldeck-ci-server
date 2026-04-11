@@ -32,6 +32,15 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(TestRunStatusChanged::class, SendTestRunCompletedEmail::class);
         Event::listen(TestRunStatusChanged::class, SendTestRunSlackNotification::class);
 
+        // Redis queue retry_after defaults to 90 s in Laravel's vendor config, which
+        // is far shorter than a typical test run. Override it here so jobs are never
+        // re-queued mid-flight and immediately fail with MaxAttemptsExceededException.
+        // Value matches the --timeout=14400 set on the queue worker in supervisord.conf.
+        Config::set(
+            'queue.connections.redis.retry_after',
+            (int) env('REDIS_QUEUE_RETRY_AFTER', 14460)
+        );
+
         $this->applyMailSettings();
         $this->applySsoSettings();
     }
