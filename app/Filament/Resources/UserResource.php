@@ -61,7 +61,8 @@ class UserResource extends Resource
                     ->label('Slack User ID')
                     ->placeholder('U12345ABCDE')
                     ->helperText('Optional. Leave blank to auto-resolve from the user\'s email address. Format: U followed by alphanumeric characters.')
-                    ->nullable(),
+                    ->nullable()
+                    ->rules(['nullable', 'regex:/^U[A-Z0-9]{6,}$/i']),
             ])->columns(2),
         ]);
     }

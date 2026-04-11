@@ -28,7 +28,7 @@ class UpdateUserRequest extends FormRequest
             'email'         => ['sometimes', 'email', 'unique:users,email,' . $userId],
             'password'      => ['sometimes', 'string', 'min:8', 'confirmed'],
             'role'          => ['sometimes', 'in:admin,pm'],
-            'slack_user_id' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'slack_user_id' => ['sometimes', 'nullable', 'string', 'regex:/^U[A-Z0-9]{6,}$/i'],
         ];
     }
 
