@@ -435,6 +435,170 @@ Leave the deploy key fields blank.
 
 ---
 
+## Webhook Integration
+
+Webhook triggers let you start a test run from any CI pipeline without storing an API token — requests are authenticated via an HMAC-SHA256 signature computed with a per-project secret.
+
+### How it works
+
+1. Your CI pipeline builds a JSON payload and computes `HMAC-SHA256(raw_body, webhook_secret)`.
+2. The signature is sent in the `X-Webhook-Signature` request header (hex digest).
+3. The server verifies the signature before dispatching the run. Unsigned or incorrectly signed requests are rejected with `403`.
+
+### Endpoint
+
+```
+POST /api/v1/webhook/trigger
+Content-Type: application/json
+X-Webhook-Signature: <hmac-sha256-hex-of-body>
+```
+
+### Payload fields
+
+| Field      | Type      | Required | Description                                              |
+| ---------- | --------- | -------- | -------------------------------------------------------- |
+| `suite_id` | `integer` | Yes      | ID of the test suite to run.                             |
+| `branch`   | `string`  | No       | Branch to check out. Defaults to the suite's configured branch. |
+| `env`      | `object`  | No       | Key/value pairs that override environment variables for this run only. |
+
+Example payload:
+
+```json
+{
+  "suite_id": 1,
+  "branch": "main",
+  "env": {
+    "BASE_URL": "https://staging.example.com"
+  }
+}
+```
+
+### Generate / rotate the webhook secret
+
+In the admin panel: **Management → Projects → Edit Project → Webhook Secret → Generate Secret** (or **Rotate Secret** to replace an existing one). The plaintext secret is shown once — store it immediately in your CI provider's secret manager.
+
+### GitHub Actions
+
+Store the secret as `TD_WEBHOOK_SECRET` in **Settings → Secrets and variables → Actions**.
+
+```yaml
+# .github/workflows/trigger-tests.yml
+name: Trigger Test Dashboard
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      suite_id:
+        description: 'Suite ID to run'
+        required: true
+        default: '1'
+      branch:
+        description: 'Branch to test (leave blank for triggering branch)'
+        required: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger test run
+        env:
+          TD_SECRET: ${{ secrets.TD_WEBHOOK_SECRET }}
+          SUITE_ID: ${{ inputs.suite_id || '1' }}
+          BRANCH: ${{ inputs.branch || github.ref_name }}
+        run: |
+          PAYLOAD=$(jq -cn --argjson suite_id "$SUITE_ID" --arg branch "$BRANCH" \
+            '{suite_id: $suite_id, branch: $branch}')
+          SIG=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$TD_SECRET" | awk '{print $NF}')
+          curl -sf -X POST "https://your-domain.com/api/v1/webhook/trigger" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Signature: $SIG" \
+            -d "$PAYLOAD"
+```
+
+### GitLab CI
+
+Store the secret as `TD_WEBHOOK_SECRET` in **Settings → CI/CD → Variables** (masked, protected).
+
+```yaml
+# .gitlab-ci.yml (job)
+trigger_tests:
+  stage: .pre
+  image: alpine:latest
+  variables:
+    SUITE_ID: "1"
+    BRANCH: $CI_COMMIT_REF_NAME
+  before_script:
+    - apk add --no-cache curl openssl jq
+  script:
+    - >
+      PAYLOAD=$(jq -cn --argjson suite_id "$SUITE_ID" --arg branch "$BRANCH"
+      '{suite_id: $suite_id, branch: $branch}')
+    - SIG=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$TD_WEBHOOK_SECRET" | awk '{print $NF}')
+    - >
+      curl -sf -X POST "https://your-domain.com/api/v1/webhook/trigger"
+      -H "Content-Type: application/json"
+      -H "X-Webhook-Signature: $SIG"
+      -d "$PAYLOAD"
+  only:
+    - main
+```
+
+### Bitbucket Pipelines
+
+Store the secret as `TD_WEBHOOK_SECRET` in **Settings → Pipelines → Repository variables**.
+
+```yaml
+# bitbucket-pipelines.yml
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Trigger Test Dashboard
+          image: alpine:latest
+          script:
+            - apk add --no-cache curl openssl jq
+            - >
+              PAYLOAD=$(jq -cn
+              --argjson suite_id "${SUITE_ID:-1}"
+              --arg branch "${OVERRIDE_BRANCH:-$BITBUCKET_BRANCH}"
+              '{suite_id: $suite_id, branch: $branch}')
+            - SIG=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$TD_WEBHOOK_SECRET" | awk '{print $NF}')
+            - >
+              curl -sf -X POST "https://your-domain.com/api/v1/webhook/trigger"
+              -H "Content-Type: application/json"
+              -H "X-Webhook-Signature: $SIG"
+              -d "$PAYLOAD"
+
+# Repository variables:
+#   TD_WEBHOOK_SECRET  — the generated secret
+#   SUITE_ID           — optional; defaults to 1
+#   OVERRIDE_BRANCH    — optional; defaults to the triggering branch
+```
+
+### Shell / cURL
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+TD_SECRET="${TD_WEBHOOK_SECRET}"
+SUITE_ID=1
+
+PAYLOAD=$(jq -cn --argjson suite_id "$SUITE_ID" --arg branch "main" \
+  '{suite_id: $suite_id, branch: $branch}')
+SIG=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$TD_SECRET" | awk '{print $NF}')
+
+curl -sf -X POST "https://your-domain.com/api/v1/webhook/trigger" \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Signature: $SIG" \
+  -d "$PAYLOAD"
+```
+
+> **Note:** `jq` is used to build the payload because it correctly handles branch names containing `/` or special characters. If `jq` is unavailable, ensure your manual JSON escaping is correct — the HMAC is computed over the exact bytes sent as the request body.
+
+---
+
 ## Roles & Permissions
 
 | Capability                         | Admin | PM  |

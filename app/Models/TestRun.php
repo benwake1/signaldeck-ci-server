@@ -10,6 +10,7 @@
 namespace App\Models;
 
 use App\Enums\RunnerType;
+use App\Enums\TriggerSource;
 use App\Jobs\RunCypressTestJob;
 use App\Jobs\RunPlaywrightTestJob;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,8 @@ class TestRun extends Model
         'test_suite_id',
         'runner_type',
         'triggered_by',
+        'trigger_source',
+        'storage_disk',
         'status',
         'branch',
         'commit_sha',
@@ -45,6 +48,7 @@ class TestRun extends Model
 
     protected $casts = [
         'runner_type' => RunnerType::class,
+        'trigger_source' => TriggerSource::class,
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'total_tests' => 'integer',

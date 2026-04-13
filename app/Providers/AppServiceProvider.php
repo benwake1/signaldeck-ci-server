@@ -13,6 +13,7 @@ use App\Events\TestRunStatusChanged;
 use App\Listeners\SendTestRunCompletedEmail;
 use App\Listeners\SendTestRunSlackNotification;
 use App\Models\AppSetting;
+use App\Services\S3ConfigService;
 use App\Services\SlackService;
 use App\Services\SsoConfigService;
 use Illuminate\Support\Facades\Config;
@@ -29,6 +30,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Load S3 config from DB — matches the pattern of applyMailSettings() / applySsoSettings().
+        // try/catch guards against the DB being unavailable during migrations.
+        try {
+            S3ConfigService::loadFromSettings();
+        } catch (\Throwable) {
+            // DB not ready (e.g., fresh install before migrations). Fall back to .env config.
+        }
+
         Event::listen(TestRunStatusChanged::class, SendTestRunCompletedEmail::class);
         Event::listen(TestRunStatusChanged::class, SendTestRunSlackNotification::class);
 

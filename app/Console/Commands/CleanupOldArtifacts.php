@@ -42,48 +42,45 @@ class CleanupOldArtifacts extends Command
 
         // chunkById avoids loading all rows into memory at once.
         $query->chunkById(50, function ($runs) use ($dryRun, &$totalFreed) {
-        foreach ($runs as $run) {
-            $this->line("  Run #{$run->id} — {$run->created_at->format('d M Y')}");
+            foreach ($runs as $run) {
+                $disk      = $run->storage_disk ?? config('filesystems.default');
+                $mediaDisk = $disk === 's3' ? 's3' : 'public';
 
-            // Reports (local/private disk)
-            $reportDir = "reports/run-{$run->id}";
-            if (Storage::disk('local')->exists($reportDir)) {
-                $size = $this->directorySize(Storage::disk('local')->path($reportDir));
-                $this->line("    → Reports: " . $this->humanSize($size));
-                $totalFreed += $size;
+                $this->line("  Run #{$run->id} — {$run->created_at->format('d M Y')} [{$disk}]");
+
+                $reportDir = "reports/run-{$run->id}";
+                if (Storage::disk($disk)->exists($reportDir)) {
+                    if ($disk === 's3') {
+                        $this->line("    → Reports: (S3 directory)");
+                    } else {
+                        $size = $this->directorySize(Storage::disk($disk)->path($reportDir));
+                        $this->line("    → Reports: " . $this->humanSize($size));
+                        $totalFreed += $size;
+                    }
+                    if (!$dryRun) {
+                        Storage::disk($disk)->deleteDirectory($reportDir);
+                    }
+                }
+
+                $artifactDir = "runs/{$run->id}";
+                if (Storage::disk($mediaDisk)->exists($artifactDir)) {
+                    if ($mediaDisk === 's3') {
+                        $this->line("    → Media:   (S3 directory)");
+                    } else {
+                        $size = $this->directorySize(Storage::disk($mediaDisk)->path($artifactDir));
+                        $this->line("    → Media:   " . $this->humanSize($size));
+                        $totalFreed += $size;
+                    }
+                    if (!$dryRun) {
+                        Storage::disk($mediaDisk)->deleteDirectory($artifactDir);
+                    }
+                }
 
                 if (!$dryRun) {
-                    Storage::disk('local')->deleteDirectory($reportDir);
+                    $run->update(['report_html_path' => null, 'merged_json_path' => null]);
+                    $run->testResults()->update(['screenshot_paths' => null, 'video_path' => null]);
                 }
             }
-
-            // Screenshots + videos (public disk)
-            $artifactDir = "runs/{$run->id}";
-            if (Storage::disk('public')->exists($artifactDir)) {
-                $size = $this->directorySize(Storage::disk('public')->path($artifactDir));
-                $this->line("    → Media:   " . $this->humanSize($size));
-                $totalFreed += $size;
-
-                if (!$dryRun) {
-                    Storage::disk('public')->deleteDirectory($artifactDir);
-                }
-            }
-
-            if (!$dryRun) {
-                // Null out paths on the run
-                $run->update([
-                    'report_html_path' => null,
-                    'merged_json_path' => null,
-                ]);
-
-                // Null out media paths on individual results
-                $run->testResults()->update([
-                    'screenshot_paths' => null,
-                    'video_path'       => null,
-                ]);
-            }
-        }
-
         }); // end chunkById
 
         $this->newLine();

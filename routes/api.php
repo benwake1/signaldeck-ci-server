@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\TestHistoryController;
 use App\Http\Controllers\Api\V1\TestRunController;
 use App\Http\Controllers\Api\V1\TestSuiteController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,10 @@ use Illuminate\Support\Facades\Route;
 // ── Public (unauthenticated) ────────────────────────────────────────────
 
 Route::get('health', HealthController::class);
+
+// ── Webhooks (public, signature-authenticated) ────────────────────────
+Route::post('webhook/trigger', [WebhookController::class, 'trigger'])
+    ->name('api.v1.webhook.trigger');
 
 // ── Auth ────────────────────────────────────────────────────────────────
 
@@ -108,6 +113,7 @@ Route::middleware(['auth:sanctum', EnsureApiTokenAbility::class.':desktop:admin'
     Route::delete('projects/{project}', [ProjectController::class, 'destroy']);
     Route::post('projects/{project}/generate-key', [ProjectController::class, 'generateKey']);
     Route::post('projects/{project}/discover-projects', [ProjectController::class, 'discoverProjects']);
+    Route::post('projects/{project}/rotate-webhook-secret', [ProjectController::class, 'rotateSecret']);
 
     // Test Suites (CRUD)
     Route::post('projects/{project}/suites', [TestSuiteController::class, 'store']);
@@ -129,6 +135,12 @@ Route::middleware(['auth:sanctum', EnsureApiTokenAbility::class.':desktop:admin'
     Route::get('settings/slack', [SettingsController::class, 'slack']);
     Route::put('settings/slack', [SettingsController::class, 'updateSlack']);
     Route::post('settings/slack/test', [SettingsController::class, 'testSlack'])
+        ->middleware('throttle:3,1');
+
+    // Storage / S3
+    Route::get('settings/storage', [SettingsController::class, 'storage']);
+    Route::put('settings/storage', [SettingsController::class, 'updateStorage']);
+    Route::post('settings/storage/migrate', [SettingsController::class, 'migrateStorage'])
         ->middleware('throttle:3,1');
 
     // Users

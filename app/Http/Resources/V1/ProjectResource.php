@@ -25,7 +25,13 @@ class ProjectResource extends JsonResource
             'repo_url' => $this->repo_url,
             'repo_provider' => $this->repo_provider,
             'default_branch' => $this->default_branch,
-            'has_deploy_key' => !empty($this->getRawOriginal('deploy_key_public')),
+            'has_deploy_key'      => !empty($this->getRawOriginal('deploy_key_public')),
+            'webhook_url'         => $request->user()?->isAdmin()
+                                         ? route('api.v1.webhook.trigger', [], true)
+                                         : null,
+            'webhook_secret_set'  => $request->user()?->isAdmin()
+                                         ? !empty($this->getRawOriginal('webhook_secret'))
+                                         : null,
             'runner_type' => $this->runner_type,
             'playwright_available_projects' => $this->playwright_available_projects,
             'active' => $this->active,

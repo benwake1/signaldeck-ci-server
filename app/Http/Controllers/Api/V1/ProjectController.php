@@ -77,6 +77,17 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function rotateSecret(Project $project): JsonResponse
+    {
+        $newSecret = $project->generateWebhookSecret();
+
+        return response()->json([
+            'message'        => 'Webhook secret rotated.',
+            'webhook_secret' => $newSecret,
+            'webhook_url'    => route('api.v1.webhook.trigger', [], true),
+        ]);
+    }
+
     public function discoverProjects(Project $project): JsonResponse
     {
         if (! $project->isPlaywright()) {

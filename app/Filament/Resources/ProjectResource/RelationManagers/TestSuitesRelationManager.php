@@ -118,6 +118,7 @@ class TestSuitesRelationManager extends RelationManager
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('id')->label('ID')->badge()->color('gray'),
                 Tables\Columns\TextColumn::make('name')->searchable()->weight('bold'),
                 Tables\Columns\TextColumn::make('spec_pattern')->limit(40)->copyable(),
                 Tables\Columns\TextColumn::make('branch_override')->placeholder('project default')->badge()->color('warning'),

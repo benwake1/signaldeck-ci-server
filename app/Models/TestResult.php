@@ -11,6 +11,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class TestResult extends Model
 {
@@ -44,12 +45,28 @@ class TestResult extends Model
     public function getScreenshotUrlsAttribute(): array
     {
         if (!$this->screenshot_paths) return [];
-        return array_map(fn($path) => asset('storage/' . $path), $this->screenshot_paths);
+
+        $disk = $this->testRun?->storage_disk ?? config('filesystems.default');
+
+        return array_map(function (string $path) use ($disk): string {
+            if ($disk === 's3') {
+                return Storage::disk('s3')->temporaryUrl($path, now()->addDays(30));
+            }
+            return asset('storage/' . $path);
+        }, $this->screenshot_paths);
     }
 
     public function getVideoUrlAttribute(): ?string
     {
-        return $this->video_path ? asset('storage/' . $this->video_path) : null;
+        if (!$this->video_path) return null;
+
+        $disk = $this->testRun?->storage_disk ?? config('filesystems.default');
+
+        if ($disk === 's3') {
+            return Storage::disk('s3')->temporaryUrl($this->video_path, now()->addDays(30));
+        }
+
+        return asset('storage/' . $this->video_path);
     }
 
     public function getDurationFormattedAttribute(): string

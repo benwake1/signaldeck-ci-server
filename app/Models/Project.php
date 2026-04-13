@@ -32,6 +32,7 @@ class Project extends Model
         'default_branch',
         'deploy_key_private',
         'deploy_key_public',
+        'webhook_secret',
         'runner_type',
         'playwright_available_projects',
         'env_variables',
@@ -101,6 +102,24 @@ class Project extends Model
             ]);
             return [];
         }
+    }
+
+    public function setWebhookSecretAttribute(?string $value): void
+    {
+        $this->attributes['webhook_secret'] = $value ? Crypt::encryptString($value) : null;
+    }
+
+    public function getWebhookSecretAttribute(?string $value): ?string
+    {
+        return $value ? Crypt::decryptString($value) : null;
+    }
+
+    public function generateWebhookSecret(): string
+    {
+        $secret = Str::random(32);
+        $this->webhook_secret = $secret;
+        $this->save();
+        return $secret;
     }
 
     public function generateDeployKey(): array

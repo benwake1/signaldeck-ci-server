@@ -26,17 +26,17 @@ class ReportController
      */
     public function html(TestRun $testRun): Response
     {
+        $disk = $testRun->storage_disk ?? config('filesystems.default');
+
         // Regenerate if missing
-        if (!$testRun->report_html_path || !Storage::disk('local')->exists($testRun->report_html_path)) {
+        if (!$testRun->report_html_path || !Storage::disk($disk)->exists($testRun->report_html_path)) {
             $this->reportGenerator->generateHtmlReport($testRun);
             $testRun->refresh();
         }
 
         $this->validateReportPath($testRun->report_html_path, $testRun->id);
 
-        $html = Storage::disk('local')->get($testRun->report_html_path);
-
-        return response($html, 200, [
+        return response(Storage::disk($disk)->get($testRun->report_html_path), 200, [
             'Content-Type' => 'text/html',
         ]);
     }
@@ -61,15 +61,17 @@ class ReportController
             abort(403, 'Invalid or expired report link.');
         }
 
-        if (!$testRun->report_html_path || !Storage::disk('local')->exists($testRun->report_html_path)) {
+        $disk = $testRun->storage_disk ?? config('filesystems.default');
+
+        if (!$testRun->report_html_path || !Storage::disk($disk)->exists($testRun->report_html_path)) {
             abort(404, 'Report not yet generated.');
         }
 
         $this->validateReportPath($testRun->report_html_path, $testRun->id);
 
-        $html = Storage::disk('local')->get($testRun->report_html_path);
-
-        return response($html, 200, ['Content-Type' => 'text/html']);
+        return response(Storage::disk($disk)->get($testRun->report_html_path), 200, [
+            'Content-Type' => 'text/html',
+        ]);
     }
 
     /**

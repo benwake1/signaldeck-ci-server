@@ -14,10 +14,13 @@ use App\Http\Requests\Api\V1\UpdateMailSettingsRequest;
 use App\Http\Requests\Api\V1\UpdateSettingsRequest;
 use App\Http\Requests\Api\V1\UpdateSlackSettingsRequest;
 use App\Http\Requests\Api\V1\UpdateSsoSettingsRequest;
+use App\Jobs\MigrateArtifactsToS3Job;
 use App\Models\AppSetting;
+use App\Models\TestRun;
 use App\Services\SlackService;
 use App\Services\SsoConfigService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
 
@@ -160,6 +163,67 @@ class SettingsController extends Controller
         $result = $slack->testConnection();
 
         return response()->json($result, $result['ok'] ? 200 : 422);
+    }
+
+    // MARK: - Storage / S3
+
+    public function storage(): JsonResponse
+    {
+        $pendingCount = TestRun::where(function ($q) {
+            $q->whereNull('storage_disk')->orWhere('storage_disk', '!=', 's3');
+        })->whereNotNull('report_html_path')->count();
+
+        return response()->json([
+            's3_bucket'          => AppSetting::get('s3_bucket'),
+            's3_region'          => AppSetting::get('s3_region'),
+            's3_key'             => AppSetting::get('s3_key'),
+            's3_has_secret'      => (bool) AppSetting::get('s3_secret'),
+            's3_endpoint'        => AppSetting::get('s3_endpoint'),
+            's3_use_path_style'  => AppSetting::get('s3_use_path_style') === '1',
+            'is_configured'      => (bool) AppSetting::get('s3_bucket'),
+            'migration_running'  => AppSetting::get('s3_migration_running') === '1',
+            'pending_migration_count' => $pendingCount,
+        ]);
+    }
+
+    public function updateStorage(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            's3_bucket'         => 'nullable|string|max:255',
+            's3_region'         => 'nullable|string|max:100',
+            's3_key'            => 'nullable|string|max:255',
+            's3_secret'         => 'nullable|string|max:512',
+            's3_endpoint'       => 'nullable|url|max:255',
+            's3_use_path_style' => 'boolean',
+        ]);
+
+        AppSetting::set('s3_bucket',         $data['s3_bucket'] ?? '');
+        AppSetting::set('s3_region',         $data['s3_region'] ?? '');
+        AppSetting::set('s3_key',            $data['s3_key'] ?? '');
+        AppSetting::set('s3_endpoint',       $data['s3_endpoint'] ?? '');
+        AppSetting::set('s3_use_path_style', ($data['s3_use_path_style'] ?? false) ? '1' : '0');
+
+        if (!empty($data['s3_secret'])) {
+            AppSetting::set('s3_secret', $data['s3_secret']);
+        }
+
+        return response()->json(['message' => 'Storage settings updated.']);
+    }
+
+    public function migrateStorage(): JsonResponse
+    {
+        if (!AppSetting::get('s3_bucket')) {
+            return response()->json(['message' => 'S3 is not configured.'], 422);
+        }
+
+        if (AppSetting::get('s3_migration_running') === '1') {
+            return response()->json(['message' => 'Migration already running.'], 422);
+        }
+
+        AppSetting::set('s3_migration_running', '1');
+        MigrateArtifactsToS3Job::dispatch();
+
+        return response()->json(['message' => 'Migration queued.']);
     }
 
     public function updateSso(UpdateSsoSettingsRequest $request, SsoConfigService $ssoConfig): JsonResponse
