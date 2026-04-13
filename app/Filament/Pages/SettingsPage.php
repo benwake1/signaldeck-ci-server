@@ -119,12 +119,37 @@ class SettingsPage extends Page
         $migrationRunning = AppSetting::get('s3_migration_running') === '1';
         $pendingCount     = $s3Configured ? $this->pendingMigrationCount() : 0;
 
-        if (!$s3Configured || $pendingCount === 0) {
-            return [];
+        $actions = [];
+
+        if ($s3Configured) {
+            $s3RunCount = TestRun::where('storage_disk', 's3')->count();
+            $actions[] = Action::make('disable_s3')
+                ->label('Disable S3')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Disable S3 storage')
+                ->modalDescription(
+                    new \Illuminate\Support\HtmlString(
+                        'This will clear all S3 credentials from the database. New artifacts will be stored on local disk.' .
+                        ($s3RunCount > 0
+                            ? ' <strong>' . $s3RunCount . ' run(s)</strong> have artifacts stored on S3 and will no longer be readable until S3 is re-configured.'
+                              . ' <a href="' . \App\Filament\Resources\TestRunResource::getUrl('index', ['tableFilters[storage_disk][value]' => 's3']) . '" target="_blank" class="underline">View affected runs →</a>'
+                            : ' No runs are currently using S3 storage.')
+                    )
+                )
+                ->modalSubmitActionLabel('Disable S3')
+                ->action(function () {
+                    foreach (['s3_bucket', 's3_region', 's3_key', 's3_secret', 's3_endpoint', 's3_use_path_style'] as $key) {
+                        AppSetting::set($key, '');
+                    }
+                    $this->fillForm();
+                    Notification::make()->title('S3 disabled')->body('Artifacts will now be stored on local disk.')->warning()->send();
+                });
         }
 
-        return [
-            Action::make('migrate_to_s3')
+        if ($s3Configured && $pendingCount > 0) {
+            $actions[] = Action::make('migrate_to_s3')
                 ->label($migrationRunning ? 'Migration in progress…' : "Migrate {$pendingCount} run(s) to S3")
                 ->icon($migrationRunning ? 'heroicon-o-arrow-path' : 'heroicon-o-cloud-arrow-up')
                 ->color('warning')
@@ -145,8 +170,10 @@ class SettingsPage extends Page
                         ->body('Artifacts will be migrated to S3 in the background.')
                         ->success()
                         ->send();
-                }),
-        ];
+                });
+        }
+
+        return $actions;
     }
 
     private function pendingMigrationCount(): int
