@@ -75,7 +75,7 @@ class MigrateArtifactsToS3Job implements ShouldQueue
 
             // Copy screenshots and videos from public disk
             $run->testResults->each(function (TestResult $result) {
-                foreach ($result->getRawOriginal('screenshot_paths') ?? [] as $path) {
+                foreach ($result->screenshot_paths ?? [] as $path) {
                     if (Storage::disk('public')->exists($path)) {
                         Storage::disk('s3')->writeStream(
                             $path,

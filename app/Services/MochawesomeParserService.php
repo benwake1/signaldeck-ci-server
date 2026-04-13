@@ -207,7 +207,7 @@ class MochawesomeParserService
     {
         $filename = basename($sourcePath);
         $destinationPath = $destinationDir . '/' . $filename;
-        Storage::disk('public')->put($destinationPath, file_get_contents($sourcePath));
+        Storage::disk(config('filesystems.default'))->put($destinationPath, file_get_contents($sourcePath));
         return $destinationPath;
     }
 }

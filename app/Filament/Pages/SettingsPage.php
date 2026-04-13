@@ -42,6 +42,9 @@ class SettingsPage extends Page
             's3_bucket'             => AppSetting::get('s3_bucket'),
             's3_region'             => AppSetting::get('s3_region'),
             's3_key'                => AppSetting::get('s3_key'),
+            // Never expose the real secret — use a sentinel so the field shows as set.
+            // The save() method only writes a new value when the field is non-empty and changed.
+            's3_secret'             => AppSetting::get('s3_secret') ? '••••••••••••••••' : null,
             's3_endpoint'           => AppSetting::get('s3_endpoint'),
         ]);
     }
@@ -101,8 +104,8 @@ class SettingsPage extends Page
             AppSetting::set('s3_endpoint',       $data['s3_endpoint'] ?? '');
             AppSetting::set('s3_use_path_style', $data['s3_use_path_style'] ? '1' : '0');
 
-            // Only overwrite stored secret if a new value was typed.
-            if (!empty($data['s3_secret'])) {
+            // Only overwrite stored secret if the user typed a new value (not the sentinel).
+            if (!empty($data['s3_secret']) && $data['s3_secret'] !== '••••••••••••••••') {
                 AppSetting::set('s3_secret', $data['s3_secret']);
             }
         }
