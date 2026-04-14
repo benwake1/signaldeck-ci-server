@@ -12,9 +12,9 @@
             $safeColour = fn($c) => preg_match('/^#[0-9A-Fa-f]{3,8}$/', trim($c)) ? trim($c) : '#1e40af';
         @endphp
         :root {
-            --primary:   {{ $safeColour($client->primary_colour) }};
-            --secondary: {{ $safeColour($client->secondary_colour) }};
-            --accent:    {{ $safeColour($client->accent_colour) }};
+            --primary:   {{ $safeColour($client?->primary_colour) }};
+            --secondary: {{ $safeColour($client?->secondary_colour) }};
+            --accent:    {{ $safeColour($client?->accent_colour) }};
         }
 
         /* Dynamic helpers that reference CSS variables */
@@ -103,7 +103,7 @@
         <div class="text-base opacity-80 max-w-7xl mx-auto">
             Test Suite: {{ $suite->name }} &nbsp;·&nbsp;
             Branch: {{ $run->branch }} &nbsp;·&nbsp;
-            Triggered by: {{ $run->triggeredBy->name }}
+            Triggered by: {{ $run->triggeredBy?->name ?? $run->trigger_source?->label() ?? '—' }}
         </div>
     </div>
 

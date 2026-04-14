@@ -283,7 +283,7 @@
             </div>
             <div class="rounded-lg border p-3 bg-white dark:bg-gray-800 sd-block">
                 <p class="text-xs text-gray-500">Triggered By</p>
-                <p class="font-medium text-sm">{{ $record->triggeredBy->name }}</p>
+                <p class="font-medium text-sm">{{ $record->triggeredBy?->name ?? $record->trigger_source?->label() ?? '—' }}</p>
             </div>
             <div class="rounded-lg border p-3 bg-white dark:bg-gray-800 sd-block">
                 <p class="text-xs text-gray-500">Commit SHA</p>

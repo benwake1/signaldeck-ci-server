@@ -148,7 +148,8 @@ class TestRunResource extends Resource
                     ->color('gray'),
 
                 Tables\Columns\TextColumn::make('triggeredBy.name')
-                    ->label('By'),
+                    ->label('By')
+                    ->default(fn (TestRun $record) => $record->trigger_source?->label() ?? '—'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Started')
