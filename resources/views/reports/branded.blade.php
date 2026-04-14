@@ -206,9 +206,9 @@
                                 </div>
                             @endif
 
-                            @if($result->screenshot_urls || $result->video_url)
+                            @if($result->screenshotProxyUrls() || $result->videoProxyUrl())
                                 <div class="flex gap-2 mt-2 flex-wrap items-start print:hidden">
-                                    @foreach($result->screenshot_urls ?? [] as $url)
+                                    @foreach($result->screenshotProxyUrls() as $url)
                                         <img src="{{ $url }}"
                                              class="screenshot-img h-20 rounded-md border border-gray-200 cursor-zoom-in object-cover transition-shadow"
                                              alt="Failure screenshot"
@@ -216,10 +216,10 @@
                                              data-lightbox-url="{{ $url }}"
                                              onclick="openLightbox(this.dataset.lightboxType, this.dataset.lightboxUrl)">
                                     @endforeach
-                                    @if($result->video_url)
+                                    @if($result->videoProxyUrl())
                                         <button class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md text-xs font-semibold text-blue-700 cursor-pointer hover:bg-blue-100 transition-colors"
                                                 data-lightbox-type="video"
-                                                data-lightbox-url="{{ $result->video_url }}"
+                                                data-lightbox-url="{{ $result->videoProxyUrl() }}"
                                                 onclick="openLightbox(this.dataset.lightboxType, this.dataset.lightboxUrl)">
                                             🎬 Watch video
                                         </button>

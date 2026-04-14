@@ -28,4 +28,9 @@ Route::prefix('reports')->group(function () {
     Route::get('/share/{testRun}/{token}', [ReportController::class, 'share'])
         ->name('reports.share');
 
+    // Proxy route for report assets (screenshots, videos) — auth or valid share token
+    Route::get('/run/{testRun}/asset/{path}', [ReportController::class, 'asset'])
+        ->name('reports.asset')
+        ->where('path', '.+');
+
 });

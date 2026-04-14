@@ -49,17 +49,7 @@ class ReportController
     {
         $expiry = (int) $request->query('expires', 0);
 
-        // Reject if missing or expired
-        if ($expiry === 0 || now()->timestamp > $expiry) {
-            abort(403, 'This report link has expired.');
-        }
-
-        $shareKey = hash_hmac('sha256', 'report-share-v1', config('app.key'));
-        $expectedToken = hash_hmac('sha256', "report-{$testRun->id}-{$expiry}", $shareKey);
-
-        if (!hash_equals($expectedToken, $token)) {
-            abort(403, 'Invalid or expired report link.');
-        }
+        $this->validateShareToken($token, $expiry, $testRun->id);
 
         $disk = $testRun->storage_disk ?? config('filesystems.default');
 
@@ -69,8 +59,92 @@ class ReportController
 
         $this->validateReportPath($testRun->report_html_path, $testRun->id);
 
-        return response(Storage::disk($disk)->get($testRun->report_html_path), 200, [
-            'Content-Type' => 'text/html',
+        $html = Storage::disk($disk)->get($testRun->report_html_path);
+
+        // Rewrite baked-in asset proxy URLs to include the share token so
+        // unauthenticated viewers can load screenshots and videos.
+        $assetBase = url('reports/run/' . $testRun->id . '/asset/');
+        $tokenQuery = '?token=' . rawurlencode($token) . '&expires=' . $expiry;
+        $html = preg_replace(
+            '#(' . preg_quote($assetBase, '#') . '[^"\'>\s]*)#',
+            '$1' . $tokenQuery,
+            $html
+        );
+
+        return response($html, 200, ['Content-Type' => 'text/html']);
+    }
+
+    /**
+     * Proxy a report asset (screenshot or video) from whichever disk the run uses.
+     * Requires either an authenticated session or a valid share token.
+     *
+     * Supports HTTP Range requests (required for video streaming in WKWebView/Safari).
+     * For S3 assets, redirects to a short-lived signed URL so range requests are
+     * handled natively by S3 rather than proxied through Laravel.
+     */
+    public function asset(Request $request, TestRun $testRun, string $path): Response
+    {
+        if (!auth()->check()) {
+            $token  = (string) $request->query('token', '');
+            $expiry = (int) $request->query('expires', 0);
+            $this->validateShareToken($token, $expiry, $testRun->id);
+        }
+
+        if (str_contains($path, '..')) {
+            abort(403);
+        }
+
+        $disk = $testRun->storage_disk === 's3' ? 's3' : 'public';
+
+        if (!Storage::disk($disk)->exists($path)) {
+            abort(404);
+        }
+
+        // For S3, redirect to a short-lived signed URL. S3 handles range requests
+        // natively, which is required for video streaming in WKWebView.
+        if ($disk === 's3') {
+            $signedUrl = Storage::disk('s3')->temporaryUrl($path, now()->addMinutes(60));
+            return redirect($signedUrl);
+        }
+
+        // For local disk, stream with range-request support so video works in WKWebView.
+        $fullPath = Storage::disk($disk)->path($path);
+        $size     = Storage::disk($disk)->size($path);
+        $mimeType = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';
+
+        $rangeHeader = $request->header('Range');
+
+        if ($rangeHeader && preg_match('/bytes=(\d*)-(\d*)/', $rangeHeader, $m)) {
+            $start = $m[1] !== '' ? (int) $m[1] : 0;
+            $end   = $m[2] !== '' ? (int) $m[2] : $size - 1;
+            $end   = min($end, $size - 1);
+
+            if ($start > $end) {
+                abort(416, 'Range Not Satisfiable');
+            }
+
+            $length = $end - $start + 1;
+
+            $fp = fopen($fullPath, 'rb');
+            if ($fp === false) {
+                abort(500);
+            }
+            fseek($fp, $start);
+            $content = fread($fp, $length);
+            fclose($fp);
+
+            return response($content, 206, [
+                'Content-Type'   => $mimeType,
+                'Content-Range'  => "bytes {$start}-{$end}/{$size}",
+                'Content-Length' => $length,
+                'Accept-Ranges'  => 'bytes',
+            ]);
+        }
+
+        return response(Storage::disk($disk)->get($path), 200, [
+            'Content-Type'   => $mimeType,
+            'Content-Length' => $size,
+            'Accept-Ranges'  => 'bytes',
         ]);
     }
 
@@ -84,6 +158,20 @@ class ReportController
 
         if (!$path || !str_starts_with($path, $expectedPrefix)) {
             abort(403, 'Invalid report path.');
+        }
+    }
+
+    private function validateShareToken(string $token, int $expiry, int $runId): void
+    {
+        if ($expiry === 0 || now()->timestamp > $expiry) {
+            abort(403, 'This report link has expired.');
+        }
+
+        $shareKey      = hash_hmac('sha256', 'report-share-v1', config('app.key'));
+        $expectedToken = hash_hmac('sha256', "report-{$runId}-{$expiry}", $shareKey);
+
+        if (!hash_equals($expectedToken, $token)) {
+            abort(403, 'Invalid or expired report link.');
         }
     }
 }

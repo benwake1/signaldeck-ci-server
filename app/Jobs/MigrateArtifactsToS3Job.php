@@ -12,6 +12,7 @@ namespace App\Jobs;
 use App\Models\AppSetting;
 use App\Models\TestResult;
 use App\Models\TestRun;
+use App\Services\ReportGeneratorService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,6 +32,8 @@ class MigrateArtifactsToS3Job implements ShouldQueue
     {
         AppSetting::set('s3_migration_running', '1');
 
+        AppSetting::set('s3_migration_cancel', '0');
+
         try {
             TestRun::where(function ($q) {
                     $q->whereNull('storage_disk')
@@ -45,12 +48,18 @@ class MigrateArtifactsToS3Job implements ShouldQueue
                 })
                 ->with('testResults')
                 ->chunkById(25, function ($runs) {
+                    if (AppSetting::get('s3_migration_cancel') === '1') {
+                        Log::info('S3 artifact migration cancelled by user.');
+                        return false; // stops chunkById iteration
+                    }
+
                     foreach ($runs as $run) {
                         $this->migrateRun($run);
                     }
                 });
         } finally {
             AppSetting::set('s3_migration_running', '0');
+            AppSetting::set('s3_migration_cancel', '0');
         }
     }
 
@@ -92,6 +101,23 @@ class MigrateArtifactsToS3Job implements ShouldQueue
             });
 
             $run->update(['storage_disk' => 's3']);
+
+            // Regenerate the HTML report now that storage_disk is s3, so asset URLs
+            // in the report use the proxy route rather than the old local paths.
+            // If regeneration fails, null out report_html_path so lazy regeneration
+            // kicks in on next access rather than serving stale content.
+            if ($run->report_html_path) {
+                try {
+                    app(ReportGeneratorService::class)->generateHtmlReport($run->fresh());
+                } catch (\Throwable $re) {
+                    Log::warning("S3 migration: could not regenerate report for run #{$run->id}, clearing path for lazy rebuild.", [
+                        'error' => $re->getMessage(),
+                    ]);
+                    $run->update(['report_html_path' => null]);
+                }
+            }
+
+            Log::info("S3 artifact migration: run #{$run->id} complete.");
 
         } catch (\Throwable $e) {
             Log::error("S3 artifact migration failed for run #{$run->id}", [

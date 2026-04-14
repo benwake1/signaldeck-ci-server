@@ -16,11 +16,28 @@ use Illuminate\Console\Command;
 
 class ArtifactMigrationCommand extends Command
 {
-    protected $signature   = 'artifacts:migrate-to-s3 {--dry-run : Show what would be migrated without copying}';
+    protected $signature   = 'artifacts:migrate-to-s3 {--dry-run : Show what would be migrated without copying} {--cancel : Cancel a running migration} {--reset : Clear a stuck migration flag}';
     protected $description = 'Migrate existing local artifacts to S3 storage';
 
     public function handle(): int
     {
+        if ($this->option('reset')) {
+            AppSetting::set('s3_migration_running', '0');
+            AppSetting::set('s3_migration_cancel', '0');
+            $this->info('Migration flags cleared.');
+            return 0;
+        }
+
+        if ($this->option('cancel')) {
+            if (AppSetting::get('s3_migration_running') !== '1') {
+                $this->warn('No migration is currently running.');
+                return 0;
+            }
+            AppSetting::set('s3_migration_cancel', '1');
+            $this->info('Cancel signal sent. The migration will stop after the current chunk completes.');
+            return 0;
+        }
+
         if (!AppSetting::get('s3_bucket')) {
             $this->error('S3 is not configured. Set s3_bucket in Filament Settings first.');
             return 1;

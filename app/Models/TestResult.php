@@ -50,7 +50,7 @@ class TestResult extends Model
 
         return array_map(function (string $path) use ($disk): string {
             if ($disk === 's3') {
-                return Storage::disk('s3')->temporaryUrl($path, now()->addDays(30));
+                return Storage::disk('s3')->temporaryUrl($path, now()->addHours(1));
             }
             return asset('storage/' . $path);
         }, $this->screenshot_paths);
@@ -63,10 +63,35 @@ class TestResult extends Model
         $disk = $this->testRun?->storage_disk ?? config('filesystems.default');
 
         if ($disk === 's3') {
-            return Storage::disk('s3')->temporaryUrl($this->video_path, now()->addDays(30));
+            return Storage::disk('s3')->temporaryUrl($this->video_path, now()->addHours(1));
         }
 
         return asset('storage/' . $this->video_path);
+    }
+
+    /**
+     * Screenshot URLs routed through Laravel — stable regardless of storage backend.
+     * Use these when baking URLs into static HTML (reports), not for dynamic views.
+     */
+    public function screenshotProxyUrls(): array
+    {
+        if (!$this->screenshot_paths) return [];
+
+        return array_map(
+            fn (string $path) => route('reports.asset', ['testRun' => $this->test_run_id, 'path' => $path]),
+            $this->screenshot_paths
+        );
+    }
+
+    /**
+     * Video URL routed through Laravel — stable regardless of storage backend.
+     * Use this when baking URLs into static HTML (reports), not for dynamic views.
+     */
+    public function videoProxyUrl(): ?string
+    {
+        if (!$this->video_path) return null;
+
+        return route('reports.asset', ['testRun' => $this->test_run_id, 'path' => $this->video_path]);
     }
 
     public function getDurationFormattedAttribute(): string
