@@ -112,10 +112,24 @@ class ReportController
 
         $disk = $testRun->storage_disk === 's3' ? 's3' : 'local';
 
+        $exists = false;
         try {
             $exists = Storage::disk($disk)->exists($path);
         } catch (\Exception) {
             abort(404);
+        }
+
+        // Fall back to the public disk for artifacts created before the S3 storage
+        // refactor (pre-branch runs wrote screenshots/videos to the public disk).
+        if (!$exists && $disk === 'local') {
+            try {
+                if (Storage::disk('public')->exists($path)) {
+                    $disk   = 'public';
+                    $exists = true;
+                }
+            } catch (\Exception) {
+                // ignore
+            }
         }
 
         if (!$exists) {

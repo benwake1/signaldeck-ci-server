@@ -11,6 +11,7 @@ namespace App\Filament\Pages;
 
 use App\Jobs\MigrateArtifactsToS3Job;
 use App\Models\AppSetting;
+use Illuminate\Support\Facades\Crypt;
 use App\Models\TestRun;
 use Filament\Actions\Action;
 use Filament\Forms;
@@ -44,8 +45,9 @@ class SettingsPage extends Page
             's3_key'                => AppSetting::get('s3_key'),
             // Never expose the real secret — use a sentinel so the field shows as set.
             // The save() method only writes a new value when the field is non-empty and changed.
-            's3_secret'             => AppSetting::get('s3_secret') ? '••••••••••••••••' : null,
-            's3_endpoint'           => AppSetting::get('s3_endpoint'),
+            's3_secret'          => AppSetting::get('s3_secret') ? '••••••••••••••••' : null,
+            's3_endpoint'        => AppSetting::get('s3_endpoint'),
+            's3_use_path_style'  => AppSetting::get('s3_use_path_style') === '1',
         ]);
     }
 
@@ -106,7 +108,7 @@ class SettingsPage extends Page
 
             // Only overwrite stored secret if the user typed a new value (not the sentinel).
             if (!empty($data['s3_secret']) && $data['s3_secret'] !== '••••••••••••••••') {
-                AppSetting::set('s3_secret', $data['s3_secret']);
+                AppSetting::set('s3_secret', Crypt::encryptString($data['s3_secret']));
             }
         }
 

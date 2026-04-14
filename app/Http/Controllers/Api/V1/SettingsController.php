@@ -204,7 +204,7 @@ class SettingsController extends Controller
         AppSetting::set('s3_use_path_style', ($data['s3_use_path_style'] ?? false) ? '1' : '0');
 
         if (!empty($data['s3_secret'])) {
-            AppSetting::set('s3_secret', $data['s3_secret']);
+            AppSetting::set('s3_secret', Crypt::encryptString($data['s3_secret']));
         }
 
         return response()->json(['message' => 'Storage settings updated.']);

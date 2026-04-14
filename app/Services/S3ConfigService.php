@@ -11,6 +11,7 @@ namespace App\Services;
 
 use App\Models\AppSetting;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Crypt;
 
 class S3ConfigService
 {
@@ -36,7 +37,7 @@ class S3ConfigService
             [
                 'driver'                  => 's3',
                 'key'                     => AppSetting::get('s3_key'),
-                'secret'                  => AppSetting::get('s3_secret'),
+                'secret'                  => self::decryptSecret(AppSetting::get('s3_secret', '')),
                 'region'                  => AppSetting::get('s3_region'),
                 'bucket'                  => $bucket,
                 'endpoint'                => AppSetting::get('s3_endpoint') ?: null,
@@ -45,5 +46,21 @@ class S3ConfigService
         ));
 
         Config::set('filesystems.default', 's3');
+    }
+
+    /**
+     * Decrypt the stored S3 secret, falling back to the raw value for any
+     * pre-encryption plaintext already in the database.
+     */
+    private static function decryptSecret(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Throwable) {
+            return $value; // legacy plaintext — will be re-encrypted on next save
+        }
     }
 }

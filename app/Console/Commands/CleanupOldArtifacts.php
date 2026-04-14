@@ -44,7 +44,13 @@ class CleanupOldArtifacts extends Command
         $query->chunkById(50, function ($runs) use ($dryRun, &$totalFreed) {
             foreach ($runs as $run) {
                 $disk      = $run->storage_disk ?? config('filesystems.default');
-                $mediaDisk = $disk === 's3' ? 's3' : 'public';
+                // Pre-refactor runs stored media on the public disk; post-refactor local
+                // runs use the local disk. S3 runs always use s3.
+                $mediaDisk = match ($disk) {
+                    's3'    => 's3',
+                    'local' => 'local',
+                    default => 'public',
+                };
 
                 $this->line("  Run #{$run->id} — {$run->created_at->format('d M Y')} [{$disk}]");
 

@@ -82,21 +82,26 @@ class MigrateArtifactsToS3Job implements ShouldQueue
                 );
             }
 
-            // Copy screenshots and videos from public disk
+            // Copy screenshots and videos — check public disk first (pre-refactor runs),
+            // then local disk (runs created after the S3 storage refactor was deployed).
             $run->testResults->each(function (TestResult $result) {
                 foreach ($result->screenshot_paths ?? [] as $path) {
-                    if (Storage::disk('public')->exists($path)) {
+                    $srcDisk = Storage::disk('public')->exists($path) ? 'public' : 'local';
+                    if (Storage::disk($srcDisk)->exists($path)) {
                         Storage::disk('s3')->writeStream(
                             $path,
-                            Storage::disk('public')->readStream($path)
+                            Storage::disk($srcDisk)->readStream($path)
                         );
                     }
                 }
-                if ($result->video_path && Storage::disk('public')->exists($result->video_path)) {
-                    Storage::disk('s3')->writeStream(
-                        $result->video_path,
-                        Storage::disk('public')->readStream($result->video_path)
-                    );
+                if ($result->video_path) {
+                    $srcDisk = Storage::disk('public')->exists($result->video_path) ? 'public' : 'local';
+                    if (Storage::disk($srcDisk)->exists($result->video_path)) {
+                        Storage::disk('s3')->writeStream(
+                            $result->video_path,
+                            Storage::disk($srcDisk)->readStream($result->video_path)
+                        );
+                    }
                 }
             });
 
