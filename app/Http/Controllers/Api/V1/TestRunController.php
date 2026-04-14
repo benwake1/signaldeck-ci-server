@@ -43,6 +43,10 @@ class TestRunController extends Controller
             $query->where('runner_type', $request->input('runner_type'));
         }
 
+        if ($request->filled('storage_disk')) {
+            $query->where('storage_disk', $request->input('storage_disk'));
+        }
+
         return TestRunResource::collection($query->latest()->paginate(25));
     }
 
