@@ -9,6 +9,7 @@
 
 namespace App\Filament\Resources\ProjectResource\RelationManagers;
 
+use App\Models\TestRun;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -44,7 +45,9 @@ class TestRunsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('failed_tests')->label('Failed')->color('danger'),
                 Tables\Columns\TextColumn::make('total_tests')->label('Total'),
                 Tables\Columns\TextColumn::make('branch')->badge()->color('gray'),
-                Tables\Columns\TextColumn::make('triggeredBy.name')->label('Triggered By'),
+                Tables\Columns\TextColumn::make('triggeredBy.name')
+                    ->label('Triggered By')
+                    ->default(fn (TestRun $record) => $record->trigger_source?->label() ?? '—'),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->label('Started'),
             ])
             ->actions([

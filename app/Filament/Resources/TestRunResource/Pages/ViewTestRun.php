@@ -9,6 +9,7 @@
 
 namespace App\Filament\Resources\TestRunResource\Pages;
 
+use App\Enums\TriggerSource;
 use App\Filament\Resources\TestRunResource;
 use App\Models\TestResult;
 use App\Models\TestRun;
@@ -141,13 +142,15 @@ class ViewTestRun extends ViewRecord
                 ->visible(fn () => $this->record->isComplete())
                 ->action(function () {
                     $newRun = TestRun::create([
-                        'project_id'    => $this->record->project_id,
-                        'test_suite_id' => $this->record->test_suite_id,
-                        'runner_type'   => $this->record->runner_type,
-                        'triggered_by'  => auth()->id(),
-                        'status'        => TestRun::STATUS_PENDING,
-                        'branch'        => $this->record->branch,
-                        'parent_run_id' => $this->record->id,
+                        'project_id'     => $this->record->project_id,
+                        'test_suite_id'  => $this->record->test_suite_id,
+                        'runner_type'    => $this->record->runner_type,
+                        'triggered_by'   => auth()->id(),
+                        'trigger_source' => TriggerSource::Manual,
+                        'storage_disk'   => config('filesystems.default'),
+                        'status'         => TestRun::STATUS_PENDING,
+                        'branch'         => $this->record->branch,
+                        'parent_run_id'  => $this->record->id,
                     ]);
 
                     $newRun->dispatchJob();
@@ -178,14 +181,16 @@ class ViewTestRun extends ViewRecord
                         ->join(',');
 
                     $newRun = TestRun::create([
-                        'project_id'    => $this->record->project_id,
-                        'test_suite_id' => $this->record->test_suite_id,
-                        'runner_type'   => $this->record->runner_type,
-                        'triggered_by'  => auth()->id(),
-                        'status'        => TestRun::STATUS_PENDING,
-                        'branch'        => $this->record->branch,
-                        'spec_override' => $failingSpecs,
-                        'parent_run_id' => $this->record->id,
+                        'project_id'     => $this->record->project_id,
+                        'test_suite_id'  => $this->record->test_suite_id,
+                        'runner_type'    => $this->record->runner_type,
+                        'triggered_by'   => auth()->id(),
+                        'trigger_source' => TriggerSource::Manual,
+                        'storage_disk'   => config('filesystems.default'),
+                        'status'         => TestRun::STATUS_PENDING,
+                        'branch'         => $this->record->branch,
+                        'spec_override'  => $failingSpecs,
+                        'parent_run_id'  => $this->record->id,
                     ]);
 
                     $newRun->dispatchJob();

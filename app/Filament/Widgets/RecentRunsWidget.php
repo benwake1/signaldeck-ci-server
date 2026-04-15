@@ -73,7 +73,9 @@ class RecentRunsWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('total_tests')->label('Total'),
 
                 Tables\Columns\TextColumn::make('branch')->badge()->color('gray'),
-                Tables\Columns\TextColumn::make('triggeredBy.name')->label('By'),
+                Tables\Columns\TextColumn::make('triggeredBy.name')
+                    ->label('By')
+                    ->default(fn (TestRun $record) => $record->trigger_source?->label() ?? '—'),
                 Tables\Columns\TextColumn::make('created_at')->since()->label('When'),
             ])
             ->actions([

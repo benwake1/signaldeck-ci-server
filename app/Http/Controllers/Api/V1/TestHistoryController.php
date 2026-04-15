@@ -31,7 +31,7 @@ class TestHistoryController extends Controller
         })
             ->where('spec_file', $request->input('spec_file'))
             ->where('full_title', $request->input('full_title'))
-            ->with('testRun:id,status,branch,created_at,duration_ms')
+            ->with('testRun:id,status,branch,created_at,duration_ms,storage_disk')
             ->latest('id')
             ->limit(50)
             ->get();

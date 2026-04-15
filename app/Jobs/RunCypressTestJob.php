@@ -71,7 +71,7 @@ class RunCypressTestJob implements ShouldQueue
             $mergedJsonPath = $this->mergeMochawesomeReports();
 
             $storedJsonPath = "reports/run-{$this->run->id}/merged.json";
-            Storage::disk('local')->put($storedJsonPath, file_get_contents($mergedJsonPath));
+            Storage::disk($this->run->storage_disk ?? config('filesystems.default'))->put($storedJsonPath, file_get_contents($mergedJsonPath));
             $this->run->update(['merged_json_path' => $storedJsonPath]);
 
             $this->log('💾 Storing test results...');

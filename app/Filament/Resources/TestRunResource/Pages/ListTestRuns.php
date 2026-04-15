@@ -9,6 +9,7 @@
 
 namespace App\Filament\Resources\TestRunResource\Pages;
 
+use App\Enums\TriggerSource;
 use App\Filament\Resources\TestRunResource;
 use App\Models\TestRun;
 use App\Models\TestSuite;
@@ -64,12 +65,14 @@ class ListTestRuns extends ListRecords
                 ->action(function (array $data) {
                     $project = \App\Models\Project::find($data['project_id']);
                     $run = TestRun::create([
-                        'project_id'    => $data['project_id'],
-                        'test_suite_id' => $data['test_suite_id'],
-                        'runner_type'   => $project->runner_type,
-                        'triggered_by'  => auth()->id(),
-                        'status'        => TestRun::STATUS_PENDING,
-                        'branch'        => $data['branch'],
+                        'project_id'     => $data['project_id'],
+                        'test_suite_id'  => $data['test_suite_id'],
+                        'runner_type'    => $project->runner_type,
+                        'triggered_by'   => auth()->id(),
+                        'trigger_source' => TriggerSource::Manual,
+                        'storage_disk'   => config('filesystems.default'),
+                        'status'         => TestRun::STATUS_PENDING,
+                        'branch'         => $data['branch'],
                     ]);
 
                     $run->dispatchJob();
