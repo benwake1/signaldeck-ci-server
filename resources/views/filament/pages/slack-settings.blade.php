@@ -8,7 +8,12 @@
         </div>
 
         <div class="px-6 py-5 space-y-4 text-sm text-gray-700 dark:text-gray-300">
-            <p>This dashboard sends direct messages to users when their test runs complete. You'll need to create a <strong>private Slack App</strong> for your own workspace — it takes about 5 minutes.</p>
+            <p class="font-medium text-gray-900 dark:text-white">SignalDeck can send two types of Slack notification using the same Slack App:</p>
+            <ul class="list-disc list-inside space-y-1 mt-1 text-gray-500 dark:text-gray-400">
+                <li><strong class="font-medium text-gray-900 dark:text-white">Run completion DMs</strong> — sent to the user who triggered a run when it finishes. Only fires for user-triggered runs; scheduled and webhook runs have no associated user so no DM is sent.</li>
+                <li><strong class="font-medium text-gray-900 dark:text-white">Health breach alerts</strong> — posted to a configured channel when a suite's pass rate drops below its threshold. Fires for all run types including scheduled runs. A 1-hour cooldown prevents repeated alerts when multiple consecutive runs fail.</li>
+            </ul>
+            <p class="mt-3 font-medium text-gray-900 dark:text-white">You'll need to create a <strong>private Slack App</strong> for your own workspace — it takes about 5 minutes.</p>
 
             <ol class="space-y-4 list-none">
                 <li class="flex gap-3">
