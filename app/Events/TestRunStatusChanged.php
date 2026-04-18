@@ -12,11 +12,10 @@ namespace App\Events;
 use App\Models\TestRun;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class TestRunStatusChanged implements ShouldBroadcast
+class TestRunStatusChanged
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

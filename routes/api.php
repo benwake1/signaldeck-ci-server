@@ -11,11 +11,11 @@ use App\Http\Controllers\Api\V1\SsoAuthController;
 use App\Http\Controllers\Api\V1\TestGeneratorController;
 use App\Http\Controllers\Api\V1\TestHistoryController;
 use App\Http\Controllers\Api\V1\TestRunController;
+use App\Http\Controllers\Api\V1\TestRunStreamController;
 use App\Http\Controllers\Api\V1\TestSuiteController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Middleware\EnsureApiTokenAbility;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -154,8 +154,15 @@ Route::middleware(['auth:sanctum', EnsureApiTokenAbility::class.':desktop:admin'
     Route::delete('users/{user}', [UserController::class, 'destroy']);
 });
 
-// ── Broadcasting auth (for WebSocket token auth) ────────────────────────
+// ── SSE Streams ──────────────────────────────────────────────────────────
+// auth:sanctum handles both session cookies (web) and Bearer tokens (macOS).
+// These routes must sit outside EnsureApiTokenAbility because that middleware
+// checks currentAccessToken(), which is null for session-authenticated web users.
 
-Route::middleware('auth:sanctum')->post('broadcasting/auth', function () {
-    return Broadcast::auth(request());
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('test-runs/{testRun}/stream', [TestRunStreamController::class, 'stream'])
+        ->name('api.v1.test-runs.stream');
+
+    Route::get('events/stream', [TestRunStreamController::class, 'globalStream'])
+        ->name('api.v1.events.stream');
 });

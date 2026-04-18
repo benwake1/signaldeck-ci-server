@@ -263,11 +263,6 @@ else
         sudo -u "${APP_USER}" cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
     fi
 
-    # Generate Reverb credentials
-    REVERB_APP_ID=$(openssl rand -hex 8)
-    REVERB_APP_KEY=$(openssl rand -hex 16)
-    REVERB_APP_SECRET=$(openssl rand -hex 16)
-
     info "Writing production .env values..."
     sudo -u "${APP_USER}" bash -c "cat > ${APP_DIR}/.env" <<EOF
 APP_NAME="SignalDeck CI"
@@ -293,19 +288,7 @@ DB_QUEUE_RETRY_AFTER=14400
 SESSION_DRIVER=database
 SESSION_LIFETIME=120
 
-BROADCAST_CONNECTION=reverb
-
-REVERB_APP_ID=${REVERB_APP_ID}
-REVERB_APP_KEY=${REVERB_APP_KEY}
-REVERB_APP_SECRET=${REVERB_APP_SECRET}
-REVERB_HOST=${DOMAIN}
-REVERB_PORT=443
-REVERB_SCHEME=https
-
-VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
-VITE_REVERB_HOST=${DOMAIN}
-VITE_REVERB_PORT=443
-VITE_REVERB_SCHEME=https
+BROADCAST_CONNECTION=log
 
 FILESYSTEM_DISK=local
 
@@ -405,14 +388,14 @@ server {
         include fastcgi_params;
     }
 
-    location /app {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_read_timeout 60s;
+    # SSE streams — disable Nginx buffering so events reach the client immediately.
+    # fastcgi_read_timeout must exceed the stream's MAX_STREAM_SECONDS (14400 s).
+    location ~ ^/api/v1/(test-runs/[0-9]+/stream|events/stream)\$ {
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_buffering off;
+        fastcgi_read_timeout 14460s;
     }
 
     location ~ /\.(?!well-known).* { deny all; }
@@ -470,17 +453,6 @@ killasgroup=true
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/cypress-notifications.log
 
-[program:cypress-reverb]
-command=php ${APP_DIR}/artisan reverb:start --host=127.0.0.1 --port=8080
-directory=${APP_DIR}
-user=${APP_USER}
-umask=002
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/cypress-reverb.log
 SUPERVISOR
 
 supervisorctl reread
@@ -515,13 +487,13 @@ echo -e "   ${BOLD}nano /etc/ssl/cloudflare/origin.pem${NC}  # paste certificate
 echo -e "   ${BOLD}nano /etc/ssl/cloudflare/origin.key${NC}  # paste private key"
 echo -e "   ${BOLD}chmod 600 /etc/ssl/cloudflare/origin.key${NC}"
 echo -e "   Then: ${BOLD}nginx -t && systemctl reload nginx${NC}"
-echo -e "   Then in Cloudflare: SSL/TLS → Full (strict), Network → WebSockets ON\n"
+echo -e "   Then in Cloudflare: SSL/TLS → Full (strict)\n"
 
 echo -e "${YELLOW}2. Cloudflare DNS${NC}"
 echo -e "   Add an A record: ${BOLD}${DOMAIN} → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')${NC} (proxied)\n"
 
 echo -e "${YELLOW}3. Start Supervisor workers${NC}"
-echo -e "   ${BOLD}supervisorctl start cypress-queue cypress-reverb${NC}"
+echo -e "   ${BOLD}supervisorctl start cypress-queue cypress-notifications${NC}"
 echo -e "   ${BOLD}supervisorctl status${NC}\n"
 
 echo -e "${YELLOW}4. Create your admin user${NC}"

@@ -62,13 +62,6 @@ class ViewTestRun extends ViewRecord
         return ['flakyTestTitles' => $flakyTestTitles];
     }
 
-    public function pollStatus(): void
-    {
-        $this->record = $this->record->fresh();
-        $this->dispatch('run-status-updated', status: $this->record->status);
-        $this->dispatch('log-updated', log: $this->record->log_output ?? '');
-    }
-
     protected function getHeaderActions(): array
     {
         return [
@@ -88,8 +81,6 @@ class ViewTestRun extends ViewRecord
                     ]);
 
                     $this->record = $this->record->fresh();
-
-                    broadcast(new \App\Events\TestRunStatusChanged($this->record));
 
                     \Filament\Notifications\Notification::make()
                         ->title('Run cancelled')

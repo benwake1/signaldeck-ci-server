@@ -13,6 +13,7 @@ use App\Enums\RunnerType;
 use App\Enums\TriggerSource;
 use App\Jobs\RunCypressTestJob;
 use App\Jobs\RunPlaywrightTestJob;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -146,6 +147,17 @@ class TestRun extends Model
     public function isRunning(): bool
     {
         return in_array($this->status, ['pending', 'cloning', 'installing', 'running']);
+    }
+
+    /**
+     * Scope runs visible to a given user.
+     *
+     * Currently all authenticated users see all runs.
+     * Add client / role filtering here if multi-tenant access control is introduced.
+     */
+    public function scopeVisibleTo(Builder $query, \App\Models\User $user): Builder
+    {
+        return $query;
     }
 
     public function getReportHtmlUrlAttribute(): ?string

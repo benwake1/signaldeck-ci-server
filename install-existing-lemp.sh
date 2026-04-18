@@ -186,22 +186,6 @@ if [[ -z "$DB_PASSWORD" ]]; then
     warning "Generated MySQL password: ${BOLD}${DB_PASSWORD}${NC} — save this now!"
 fi
 
-# ── Reverb port — must be unique per instance ──
-echo ""
-echo -e "${BOLD}Reverb WebSocket port${NC} — each instance needs its own port."
-echo -e "The default install uses 8080. If that's taken, pick another (e.g. 8081, 8082)."
-prompt REVERB_LOCAL_PORT "Reverb port" "8080"
-
-# Detect collision
-if ss -tlnp 2>/dev/null | grep -q ":${REVERB_LOCAL_PORT} "; then
-    warning "Port ${REVERB_LOCAL_PORT} is already in use!"
-    echo -e "${YELLOW}  Processes on that port:${NC}"
-    ss -tlnp 2>/dev/null | grep ":${REVERB_LOCAL_PORT} " | sed 's/^/    /'
-    echo ""
-    read -rp "$(echo -e "${BOLD}Continue anyway?${NC} [y/N] ")" PORT_CONFIRM
-    [[ "$PORT_CONFIRM" != "y" && "$PORT_CONFIRM" != "Y" ]] && error "Aborted — choose a different Reverb port."
-fi
-
 # ── Supervisor program prefix — unique per instance ──
 prompt SUPERVISOR_PREFIX "Supervisor program prefix" "${INSTANCE_SLUG}"
 
@@ -245,12 +229,8 @@ fi
 # Determine scheme
 if [[ "$SSL_CHOICE" == "4" ]]; then
     APP_SCHEME="http"
-    REVERB_EXT_PORT="${REVERB_LOCAL_PORT}"
-    REVERB_SCHEME="http"
 else
     APP_SCHEME="https"
-    REVERB_EXT_PORT="443"
-    REVERB_SCHEME="https"
 fi
 
 # ── Confirmation ──
@@ -262,8 +242,7 @@ echo -e "  Repo:         ${REPO_URL}"
 echo -e "  App dir:      ${APP_DIR}"
 echo -e "  System user:  ${APP_USER}"
 echo -e "  DB:           ${DB_NAME} / ${DB_USER}"
-echo -e "  Reverb port:  ${REVERB_LOCAL_PORT}"
-echo -e "  Supervisor:   ${SUPERVISOR_PREFIX}-queue, ${SUPERVISOR_PREFIX}-notifications, ${SUPERVISOR_PREFIX}-reverb"
+echo -e "  Supervisor:   ${SUPERVISOR_PREFIX}-queue, ${SUPERVISOR_PREFIX}-notifications"
 echo -e "  Nginx site:   ${NGINX_SITE_NAME}"
 echo -e "  SSL:          $(case $SSL_CHOICE in 1) echo "Cloudflare";; 2) echo "Let's Encrypt";; 3) echo "Custom cert";; 4) echo "None (HTTP)";; esac)"
 echo ""
@@ -408,11 +387,6 @@ else
         sudo -u "${APP_USER}" cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
     fi
 
-    # Generate Reverb credentials
-    REVERB_APP_ID=$(openssl rand -hex 8)
-    REVERB_APP_KEY=$(openssl rand -hex 16)
-    REVERB_APP_SECRET=$(openssl rand -hex 16)
-
     info "Writing production .env values..."
     sudo -u "${APP_USER}" bash -c "cat > ${APP_DIR}/.env" <<EOF
 APP_NAME="SignalDeck CI"
@@ -438,19 +412,7 @@ DB_QUEUE_RETRY_AFTER=14400
 SESSION_DRIVER=database
 SESSION_LIFETIME=120
 
-BROADCAST_CONNECTION=reverb
-
-REVERB_APP_ID=${REVERB_APP_ID}
-REVERB_APP_KEY=${REVERB_APP_KEY}
-REVERB_APP_SECRET=${REVERB_APP_SECRET}
-REVERB_HOST=${DOMAIN}
-REVERB_PORT=${REVERB_EXT_PORT}
-REVERB_SCHEME=${REVERB_SCHEME}
-
-VITE_REVERB_APP_KEY=${REVERB_APP_KEY}
-VITE_REVERB_HOST=${DOMAIN}
-VITE_REVERB_PORT=${REVERB_EXT_PORT}
-VITE_REVERB_SCHEME=${REVERB_SCHEME}
+BROADCAST_CONNECTION=log
 
 FILESYSTEM_DISK=local
 
@@ -575,15 +537,14 @@ ${SSL_BLOCK}
         include fastcgi_params;
     }
 
-    # Reverb WebSocket proxy
-    location /app {
-        proxy_pass http://127.0.0.1:${REVERB_LOCAL_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_read_timeout 60s;
+    # SSE streams — disable Nginx buffering so events reach the client immediately.
+    # fastcgi_read_timeout must exceed the stream's MAX_STREAM_SECONDS (14400 s).
+    location ~ ^/api/v1/(test-runs/[0-9]+/stream|events/stream)\$ {
+        fastcgi_pass ${FPM_SOCK};
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_buffering off;
+        fastcgi_read_timeout 14460s;
     }
 
     location ~ /\.(?!well-known).* { deny all; }
@@ -660,17 +621,6 @@ killasgroup=true
 redirect_stderr=true
 stdout_logfile=/var/log/supervisor/${SUPERVISOR_PREFIX}-notifications.log
 
-[program:${SUPERVISOR_PREFIX}-reverb]
-command=php ${APP_DIR}/artisan reverb:start --host=127.0.0.1 --port=${REVERB_LOCAL_PORT}
-directory=${APP_DIR}
-user=${APP_USER}
-umask=002
-autostart=true
-autorestart=true
-stopasgroup=true
-killasgroup=true
-redirect_stderr=true
-stdout_logfile=/var/log/supervisor/${SUPERVISOR_PREFIX}-reverb.log
 SUPERVISOR
 
 supervisorctl reread
@@ -712,7 +662,7 @@ case $SSL_CHOICE in
         else
             echo -e "  Cloudflare certs already in place."
         fi
-        echo -e "  In Cloudflare: SSL/TLS → Full (strict), Network → WebSockets ON\n"
+        echo -e "  In Cloudflare: SSL/TLS → Full (strict)\n"
         ;;
     2)
         echo -e "${YELLOW}SSL — Let's Encrypt:${NC}"
@@ -745,14 +695,13 @@ echo -e "  Name:        ${INSTANCE_NAME}"
 echo -e "  Directory:   ${APP_DIR}"
 echo -e "  DB:          ${DB_NAME} / ${DB_USER}"
 echo -e "  DB password: ${BOLD}${DB_PASSWORD}${NC}"
-echo -e "  Reverb port: ${REVERB_LOCAL_PORT}"
 echo -e "  Supervisor:  ${SUPERVISOR_CONF}"
 echo -e "  Nginx:       /etc/nginx/sites-available/${NGINX_SITE_NAME}"
 echo -e "  App URL:     ${BOLD}${APP_SCHEME}://${DOMAIN}${NC}"
 echo -e "  Admin panel: ${BOLD}${APP_SCHEME}://${DOMAIN}/admin${NC}\n"
 
 echo -e "${BOLD}To remove this instance later:${NC}"
-echo -e "  ${BOLD}supervisorctl stop ${SUPERVISOR_PREFIX}-queue:* ${SUPERVISOR_PREFIX}-notifications:* ${SUPERVISOR_PREFIX}-reverb:*${NC}"
+echo -e "  ${BOLD}supervisorctl stop ${SUPERVISOR_PREFIX}-queue:* ${SUPERVISOR_PREFIX}-notifications:*${NC}"
 echo -e "  ${BOLD}rm ${SUPERVISOR_CONF} && supervisorctl reread && supervisorctl update${NC}"
 echo -e "  ${BOLD}rm /etc/nginx/sites-enabled/${NGINX_SITE_NAME} /etc/nginx/sites-available/${NGINX_SITE_NAME} && nginx -t && systemctl reload nginx${NC}"
 echo -e "  ${BOLD}mysql -u root -e \"DROP DATABASE ${DB_NAME}; DROP USER '${DB_USER}'@'localhost';\"${NC}"

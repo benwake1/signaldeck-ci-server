@@ -12,8 +12,6 @@
     <div
         x-data="testRunViewer(@js($record->id), @js($record->status), @js($record->isRunning()), @js($record->log_output ?? ''))"
         data-run-status="{{ $record->status }}"
-        x-init="init()"
-        @if($record->isRunning()) wire:poll.3000ms="pollStatus" @endif
         class="flex flex-col gap-6"
     >
 
@@ -357,10 +355,8 @@
                 runId: runId,
                 status: initialStatus,
                 isRunning: initiallyRunning,
-                initialLog: initialLog,
                 hasLog: !!initialLog,
                 logHtml: '',
-                _lastLogLength: 0,
 
                 _ansiUp: null,
                 getAnsiUp() {
@@ -381,14 +377,12 @@
                 },
                 ansiToHtml(text) {
                     const au = this.getAnsiUp();
-                    // Normalise line endings (\r\n and bare \r → \n)
                     const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                     // AnsiUp v5+ HTML-escapes content internally (safe).
                     // Fallback: manually escape to prevent XSS before stripping ANSI codes.
                     const html = au
                         ? au.ansi_to_html(normalised)
                         : this.escapeHtml(normalised).replace(/\x1b\[[0-9;]*m/g, '');
-                    // Explicit <br> so line breaks survive innerHTML assignment
                     return html.replace(/\n/g, '<br>');
                 },
 
@@ -420,10 +414,19 @@
                     return desc[this.status] || '';
                 },
 
-                updateLog(log) {
-                    if (!log || !log.trim() || log.length <= this._lastLogLength) return;
+                appendChunk(chunk) {
+                    if (!chunk) return;
                     this.hasLog = true;
-                    this._lastLogLength = log.length;
+                    this.logHtml += this.ansiToHtml(chunk);
+                    this.$nextTick(() => {
+                        const c = document.getElementById('log-container');
+                        if (c) c.scrollTop = c.scrollHeight;
+                    });
+                },
+
+                renderInitialLog(log) {
+                    if (!log || !log.trim()) return;
+                    this.hasLog = true;
                     this.logHtml = this.ansiToHtml(log);
                     this.$nextTick(() => {
                         const c = document.getElementById('log-container');
@@ -432,28 +435,50 @@
                 },
 
                 init() {
-                    // Render initial log output (e.g. viewing a completed run)
-                    if (this.initialLog) {
-                        this.updateLog(this.initialLog);
+                    // Render the initial log snapshot (completed runs, or re-opens mid-run).
+                    if (initialLog) {
+                        this.renderInitialLog(initialLog);
                     }
 
-                    // Sync status from Livewire poll
-                    window.addEventListener('run-status-updated', (e) => {
-                        const newStatus = e.detail.status;
-                        if (newStatus && newStatus !== this.status) {
-                            this.status = newStatus;
-                            this.isRunning = ['pending','cloning','installing','running'].includes(newStatus);
-                            if (!this.isRunning) {
-                                setTimeout(() => window.location.reload(), 1500);
-                            }
+                    // Completed runs don't open a stream — everything is already rendered.
+                    if (!this.isRunning) return;
+
+                    // Track the byte offset so reconnects resume from the right position.
+                    this._byteOffset = new TextEncoder().encode(initialLog || '').length;
+                    this._connectStream();
+                },
+
+                _connectStream() {
+                    const terminalStatuses = ['passing', 'failed', 'error', 'cancelled'];
+                    const es = new EventSource(`/api/v1/test-runs/${this.runId}/stream?from_byte=${this._byteOffset}`);
+
+                    es.addEventListener('log.chunk', (e) => {
+                        const { chunk, byte_offset } = JSON.parse(e.data);
+                        this.appendChunk(chunk);
+                        // Keep the offset current so reconnects don't replay received content.
+                        if (byte_offset) this._byteOffset = byte_offset;
+                    });
+
+                    es.addEventListener('status.changed', (e) => {
+                        const data = JSON.parse(e.data);
+                        this.status = data.status;
+                        this.isRunning = !terminalStatuses.includes(data.status);
+
+                        if (!this.isRunning) {
+                            es.close();
+                            // Reload to show server-rendered test results, screenshots, etc.
+                            setTimeout(() => window.location.reload(), 1500);
                         }
                     });
 
-                    // Update console from Livewire poll (works without WebSocket)
-                    window.addEventListener('log-updated', (e) => {
-                        this.updateLog(e.detail.log);
-                    });
-
+                    // On error, close and reconnect manually with the current byte offset
+                    // rather than letting the browser reuse the stale ?from_byte URL.
+                    es.onerror = () => {
+                        es.close();
+                        if (this.isRunning) {
+                            setTimeout(() => this._connectStream(), 3000);
+                        }
+                    };
                 }
             }
         }

@@ -10,6 +10,8 @@
 namespace App\Providers;
 
 use App\Models\AppSetting;
+use App\Models\TestRun;
+use App\Observers\TestRunObserver;
 use App\Services\S3ConfigService;
 use App\Services\SlackService;
 use App\Services\SsoConfigService;
@@ -26,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        TestRun::observe(TestRunObserver::class);
+
         // Load S3 config from DB — matches the pattern of applyMailSettings() / applySsoSettings().
         // try/catch guards against the DB being unavailable during migrations.
         try {

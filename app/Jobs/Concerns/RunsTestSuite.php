@@ -9,8 +9,6 @@
 
 namespace App\Jobs\Concerns;
 
-use App\Events\TestRunLogReceived;
-use App\Events\TestRunStatusChanged;
 use App\Models\TestRun;
 use Illuminate\Support\Facades\Log;
 
@@ -245,15 +243,12 @@ trait RunsTestSuite
     protected function updateStatus(string $status): void
     {
         $this->run->update(['status' => $status]);
-        broadcast(new TestRunStatusChanged($this->run->fresh()));
     }
 
     protected function log(string $message, bool $persist = true): void
     {
         $timestamp = now()->format('H:i:s');
         $logLine = "[{$timestamp}] {$message}";
-
-        broadcast(new TestRunLogReceived($this->run->id, $logLine));
 
         Log::info("Run #{$this->run->id}: {$message}");
 

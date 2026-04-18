@@ -19,6 +19,17 @@ class DashboardController extends Controller
 {
     public function stats(): JsonResponse
     {
+        return response()->json(static::computeStats());
+    }
+
+    /**
+     * Compute dashboard stats as a plain array.
+     *
+     * Extracted so it can be called from TestRunObserver without
+     * instantiating a controller or constructing a JsonResponse.
+     */
+    public static function computeStats(): array
+    {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
         $sevenDaysAgo  = Carbon::now()->subDays(7);
 
@@ -43,7 +54,7 @@ class DashboardController extends Controller
             ->whereNotNull('duration_ms')
             ->avg('duration_ms');
 
-        return response()->json([
+        return [
             'pass_rate_30d'      => $passRate,
             'total_runs_30d'     => $totalRuns,
             'passing_runs_30d'   => $passingRuns,
@@ -52,6 +63,6 @@ class DashboardController extends Controller
             'queued'             => $queued,
             'scheduled_today'    => ScheduledRunsService::countForToday(),
             'avg_duration_7d_ms' => $avgDuration ? round($avgDuration) : null,
-        ]);
+        ];
     }
 }
