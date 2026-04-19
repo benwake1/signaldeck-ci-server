@@ -9,14 +9,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RunEvent extends Model
 {
+    use MassPrunable;
+
     public $timestamps = false;
 
     protected $fillable = ['run_id', 'event_type', 'payload', 'created_at'];
+
+    public function prunable(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::where('created_at', '<', now()->subHours(24));
+    }
 
     protected $casts = ['payload' => 'array'];
 

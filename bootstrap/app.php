@@ -73,6 +73,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
         $schedule->command('runs:cleanup')->dailyAt('02:00');
+        $schedule->command('model:prune', ['--model' => [\App\Models\RunEvent::class]])->hourly();
         $schedule->command('signaldeck:run-scheduled')->everyMinute();
     })
     ->create();
