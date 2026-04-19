@@ -14,6 +14,7 @@ use App\Mail\SuiteHealthBreachedMailable;
 use App\Models\AppSetting;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 
 class SendSuiteHealthBreachEmail implements ShouldQueue
@@ -21,6 +22,11 @@ class SendSuiteHealthBreachEmail implements ShouldQueue
     public function handle(SuiteHealthBreached $event): void
     {
         if (AppSetting::get('notifications_enabled', '1') !== '1') {
+            return;
+        }
+
+        $cacheKey = "health_breach_email_sent_suite_{$event->suite->id}";
+        if (! Cache::add($cacheKey, true, now()->addHour())) {
             return;
         }
 

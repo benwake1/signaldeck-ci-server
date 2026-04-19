@@ -1295,7 +1295,7 @@ server {
     # SSE streams — disable buffering and extend read timeout for long-lived connections
     location ~ ^/api/v1/(test-runs/[0-9]+/stream|events/stream) {
         fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;
         include fastcgi_params;
         fastcgi_buffering    off;
         fastcgi_read_timeout 600s;
