@@ -73,7 +73,7 @@ class ProjectHealthWidget extends Widget
             return [
                 'id'             => $project->id,
                 'name'           => $project->name,
-                'client'         => $project->client->name,
+                'client'         => $project->client?->name ?? 'Unknown',
                 'latest'         => $latest,
                 'pass_rate'      => $passRate,
                 'suite_count'    => $project->testSuites->count(),
