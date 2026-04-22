@@ -77,16 +77,17 @@ class ReportController
 
         $html = Storage::disk($disk)->get($testRun->report_html_path);
 
-        // Rewrite baked-in asset proxy URLs to include the share token so
-        // unauthenticated viewers can load screenshots and videos.
-        // Use a scheme-agnostic pattern so the match works regardless of whether
-        // the HTML was generated with http:// or https:// (e.g. queue worker vs
-        // live request behind a TLS-terminating proxy).
-        $relPath    = '/reports/run/' . $testRun->id . '/asset/';
+        // Rewrite baked-in asset proxy URLs so unauthenticated viewers can load
+        // screenshots and videos. We replace the entire scheme+host with the
+        // current request's origin so URLs baked by the queue worker (which may
+        // have a different APP_URL scheme or hostname, e.g. http://localhost) are
+        // corrected, and then append the share token.
+        $assetPath  = '/reports/run/' . $testRun->id . '/asset/';
         $tokenQuery = '?token=' . rawurlencode($token) . '&expires=' . $expiry;
+        $baseUrl    = rtrim($request->getSchemeAndHttpHost(), '/');
         $html = preg_replace(
-            '#(https?://[^/"\'>\s]+' . preg_quote($relPath, '#') . '[^"\'>\s]*)#',
-            '$1' . $tokenQuery,
+            '#https?://[^/"\'>\s]+' . preg_quote($assetPath, '#') . '([^"\'>\s]*)#',
+            $baseUrl . $assetPath . '$1' . $tokenQuery,
             $html
         );
 
