@@ -79,10 +79,13 @@ class ReportController
 
         // Rewrite baked-in asset proxy URLs to include the share token so
         // unauthenticated viewers can load screenshots and videos.
-        $assetBase = url('reports/run/' . $testRun->id . '/asset/');
+        // Use a scheme-agnostic pattern so the match works regardless of whether
+        // the HTML was generated with http:// or https:// (e.g. queue worker vs
+        // live request behind a TLS-terminating proxy).
+        $relPath    = '/reports/run/' . $testRun->id . '/asset/';
         $tokenQuery = '?token=' . rawurlencode($token) . '&expires=' . $expiry;
         $html = preg_replace(
-            '#(' . preg_quote($assetBase, '#') . '[^"\'>\s]*)#',
+            '#(https?://[^/"\'>\s]+' . preg_quote($relPath, '#') . '[^"\'>\s]*)#',
             '$1' . $tokenQuery,
             $html
         );
