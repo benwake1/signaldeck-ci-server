@@ -242,17 +242,17 @@ trait RunsTestSuite
 
     protected function updateStatus(string $status): void
     {
-        // Never overwrite a user-initiated cancel — use a conditional UPDATE so the
-        // write is a no-op if the run was cancelled between phases.
-        TestRun::where('id', $this->run->id)
-            ->where('status', '!=', TestRun::STATUS_CANCELLED)
-            ->update(['status' => $status]);
-
+        // Refresh first to catch any cancel that arrived during the preceding phase.
+        // Using Eloquent save() (rather than a raw query builder update) ensures the
+        // TestRunObserver fires and RunEvent records are written for SSE clients.
         $this->run->refresh();
 
         if ($this->run->status === TestRun::STATUS_CANCELLED) {
             throw new \RuntimeException('Run cancelled by user.');
         }
+
+        $this->run->status = $status;
+        $this->run->save();
     }
 
     protected function log(string $message, bool $persist = true): void
