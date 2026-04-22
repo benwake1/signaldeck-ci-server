@@ -19,11 +19,16 @@ class TestRunObserver
 {
     public function updated(TestRun $run): void
     {
-        if (! $run->wasChanged('status')) {
+        $statusChanged = $run->wasChanged('status');
+        $reportReady   = $run->wasChanged('report_html_path') && $run->report_html_path !== null;
+
+        if (! $statusChanged && ! $reportReady) {
             return;
         }
 
-        $eventType = $run->isComplete() ? 'run.completed' : 'run.updated';
+        // If only the report path changed (no status transition), re-emit as
+        // run.completed so clients receive the updated path without a full reload.
+        $eventType = ($statusChanged && ! $run->isComplete()) ? 'run.updated' : 'run.completed';
 
         try {
             $run->loadMissing(['project', 'testSuite', 'triggeredBy']);
