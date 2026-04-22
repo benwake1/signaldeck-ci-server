@@ -87,7 +87,10 @@ class ViewTestRun extends ViewRecord
                         ->warning()
                         ->send();
 
-                    $this->redirect(ViewTestRun::getUrl(['record' => $this->record]));
+                    // No redirect — the SSE status.changed event will trigger the
+                    // Alpine reload within ~1 second, avoiding a double-navigation
+                    // race between Livewire redirect and window.location.reload().
+                    $this->dispatch('$refresh');
                 }),
 
             Actions\Action::make('share_report')

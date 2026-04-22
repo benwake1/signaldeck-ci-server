@@ -242,7 +242,17 @@ trait RunsTestSuite
 
     protected function updateStatus(string $status): void
     {
-        $this->run->update(['status' => $status]);
+        // Never overwrite a user-initiated cancel — use a conditional UPDATE so the
+        // write is a no-op if the run was cancelled between phases.
+        TestRun::where('id', $this->run->id)
+            ->where('status', '!=', TestRun::STATUS_CANCELLED)
+            ->update(['status' => $status]);
+
+        $this->run->refresh();
+
+        if ($this->run->status === TestRun::STATUS_CANCELLED) {
+            throw new \RuntimeException('Run cancelled by user.');
+        }
     }
 
     protected function log(string $message, bool $persist = true): void
