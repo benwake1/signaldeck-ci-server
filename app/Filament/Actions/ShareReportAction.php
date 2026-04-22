@@ -22,8 +22,9 @@ class ShareReportAction
             ->icon('heroicon-o-share')
             ->color('gray')
             ->action(function (TestRun $record) {
-                $expiry = now()->addDays(30)->timestamp;
-                $token  = hash_hmac('sha256', "report-{$record->id}-{$expiry}", config('app.key'));
+                $expiry   = now()->addDays(30)->timestamp;
+                $shareKey = hash_hmac('sha256', 'report-share-v1', config('app.key'));
+                $token    = hash_hmac('sha256', "report-{$record->id}-{$expiry}", $shareKey);
                 $url    = route('reports.share', [
                     'testRun' => $record->id,
                     'token'   => $token,
