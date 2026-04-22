@@ -123,7 +123,11 @@ class TestResult extends Model
         $shareKey = hash_hmac('sha256', 'report-share-v1', config('app.key'));
         $token    = hash_hmac('sha256', "report-{$this->test_run_id}-{$expiry}", $shareKey);
 
-        return route('reports.asset', ['testRun' => $this->test_run_id, 'path' => $path])
-            . '?token=' . $token . '&expires=' . $expiry;
+        return route('reports.sharedAsset', [
+            'testRun' => $this->test_run_id,
+            'token'   => $token,
+            'expiry'  => $expiry,
+            'path'    => $path,
+        ]);
     }
 }
