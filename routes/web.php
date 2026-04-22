@@ -41,4 +41,10 @@ Route::prefix('reports')->group(function () {
         ->name('reports.asset')
         ->where('path', '.+');
 
+    // Shared asset route — token and expiry are path segments, not query params.
+    // Query-string tokens get stripped by Cloudflare WAF; path segments are not affected.
+    Route::get('/share/{testRun}/asset/{token}/{expiry}/{path}', [ReportController::class, 'sharedAsset'])
+        ->name('reports.sharedAsset')
+        ->where('path', '.+');
+
 });

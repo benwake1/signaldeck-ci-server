@@ -78,16 +78,14 @@ class ReportController
         $html = Storage::disk($disk)->get($testRun->report_html_path);
 
         // Rewrite baked-in asset proxy URLs so unauthenticated viewers can load
-        // screenshots and videos. We replace the entire scheme+host with the
-        // current request's origin so URLs baked by the queue worker (which may
-        // have a different APP_URL scheme or hostname, e.g. http://localhost) are
-        // corrected, and then append the share token.
-        $assetPath  = '/reports/run/' . $testRun->id . '/asset/';
-        $tokenQuery = '?token=' . rawurlencode($token) . '&expires=' . $expiry;
-        $baseUrl    = rtrim($request->getSchemeAndHttpHost(), '/');
+        // screenshots and videos. Token and expiry go in the URL *path* (not query
+        // string) so Cloudflare WAF/Transform Rules cannot strip them.
+        $oldAssetPath = '/reports/run/' . $testRun->id . '/asset/';
+        $newAssetBase = '/reports/share/' . $testRun->id . '/asset/' . $token . '/' . $expiry . '/';
+        $baseUrl      = rtrim($request->getSchemeAndHttpHost(), '/');
         $html = preg_replace(
-            '#https?://[^/"\'>\s]+' . preg_quote($assetPath, '#') . '([^"\'>\s]*)#',
-            $baseUrl . $assetPath . '$1' . $tokenQuery,
+            '#https?://[^/"\'>\s]+' . preg_quote($oldAssetPath, '#') . '([^"\'>\s]*)#',
+            $baseUrl . $newAssetBase . '$1',
             $html
         );
 
@@ -148,6 +146,87 @@ class ReportController
         }
 
         // For local disk, stream with range-request support so video works in WKWebView.
+        $fullPath = Storage::disk($disk)->path($path);
+        $size     = Storage::disk($disk)->size($path);
+        $mimeType = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';
+
+        $rangeHeader = $request->header('Range');
+
+        if ($rangeHeader && preg_match('/bytes=(\d*)-(\d*)/', $rangeHeader, $m)) {
+            $start = $m[1] !== '' ? (int) $m[1] : 0;
+            $end   = $m[2] !== '' ? (int) $m[2] : $size - 1;
+            $end   = min($end, $size - 1);
+
+            if ($start > $end) {
+                abort(416, 'Range Not Satisfiable');
+            }
+
+            $length = $end - $start + 1;
+
+            $fp = fopen($fullPath, 'rb');
+            if ($fp === false) {
+                abort(500);
+            }
+            fseek($fp, $start);
+            $content = fread($fp, $length);
+            fclose($fp);
+
+            return response($content, 206, [
+                'Content-Type'   => $mimeType,
+                'Content-Range'  => "bytes {$start}-{$end}/{$size}",
+                'Content-Length' => $length,
+                'Accept-Ranges'  => 'bytes',
+            ]);
+        }
+
+        return response(Storage::disk($disk)->get($path), 200, [
+            'Content-Type'   => $mimeType,
+            'Content-Length' => $size,
+            'Accept-Ranges'  => 'bytes',
+        ]);
+    }
+
+    /**
+     * Serve a report asset for a shared (unauthenticated) viewer.
+     * Token and expiry are URL path segments to prevent Cloudflare from stripping them.
+     */
+    public function sharedAsset(Request $request, TestRun $testRun, string $token, string $expiry, string $path): Response
+    {
+        $this->validateShareToken($token, (int) $expiry, $testRun->id);
+
+        if (str_contains($path, '..')) {
+            abort(403);
+        }
+
+        $disk = $testRun->storage_disk === 's3' ? 's3' : 'local';
+
+        $exists = false;
+        try {
+            $exists = Storage::disk($disk)->exists($path);
+        } catch (\Exception) {
+            abort(404);
+        }
+
+        if (!$exists && $disk === 'local') {
+            try {
+                if (Storage::disk('public')->exists($path)) {
+                    $disk   = 'public';
+                    $exists = true;
+                }
+            } catch (\Exception) {
+                // ignore
+            }
+        }
+
+        if (!$exists) {
+            abort(404);
+        }
+
+        if ($disk === 's3') {
+            $signedUrl = Storage::disk('s3')->temporaryUrl($path, now()->addMinutes(60));
+            return redirect($signedUrl);
+        }
+
         $fullPath = Storage::disk($disk)->path($path);
         $size     = Storage::disk($disk)->size($path);
         $mimeType = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';
