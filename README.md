@@ -403,6 +403,7 @@ Webhook triggers let you start a test run from any CI pipeline without storing a
 1. Your CI pipeline builds a JSON payload and computes `HMAC-SHA256(raw_body, webhook_secret)`.
 2. The signature is sent in the `X-Webhook-Signature` request header (hex digest).
 3. The server verifies the signature before dispatching the run. Unsigned or incorrectly signed requests are rejected with `403`.
+4. **NOTE** - The webhook endpoint must be publicly accessible.
 
 ### Endpoint
 
