@@ -36,7 +36,25 @@ class ProjectResource extends JsonResource
             'playwright_available_projects' => $this->playwright_available_projects,
             'active' => $this->active,
             'pass_rate' => $this->pass_rate,
-            'latest_run' => new TestRunResource($this->whenLoaded('latestRun')),
+            'recent_pass_rate' => $this->when(
+                $this->relationLoaded('testRuns'),
+                function () {
+                    $runs = $this->testRuns->take(10);
+                    return $runs->count() > 0
+                        ? round($runs->where('status', 'passing')->count() / $runs->count() * 100)
+                        : null;
+                }
+            ),
+            'latest_run' => $this->when(
+                $this->relationLoaded('latestRun') || $this->relationLoaded('testRuns'),
+                function () {
+                    if ($this->relationLoaded('latestRun') && $this->latestRun) {
+                        return new TestRunResource($this->latestRun);
+                    }
+                    $first = $this->testRuns->first();
+                    return $first ? new TestRunResource($first) : null;
+                }
+            ),
             'client' => new ClientResource($this->whenLoaded('client')),
             'test_suites' => TestSuiteResource::collection($this->whenLoaded('testSuites')),
             'test_runs' => TestRunResource::collection($this->whenLoaded('testRuns')),

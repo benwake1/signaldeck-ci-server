@@ -34,6 +34,13 @@ class ProjectController extends Controller
             $query->where('active', filter_var($request->input('active'), FILTER_VALIDATE_BOOLEAN));
         }
 
+        if ($request->boolean('dashboard')) {
+            $query->with([
+                'testSuites' => fn($q) => $q->where('active', true)->orderBy('id'),
+                'testRuns'   => fn($q) => $q->whereIn('status', ['passing', 'failed'])->latest(),
+            ]);
+        }
+
         return ProjectResource::collection($query->latest()->paginate(25));
     }
 
