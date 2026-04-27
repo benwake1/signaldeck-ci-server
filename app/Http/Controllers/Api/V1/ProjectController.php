@@ -37,7 +37,7 @@ class ProjectController extends Controller
         if ($request->boolean('dashboard')) {
             $query->with([
                 'testSuites' => fn($q) => $q->where('active', true)->orderBy('id'),
-                'testRuns'   => fn($q) => $q->whereIn('status', ['passing', 'failed'])->latest(),
+                'testRuns'   => fn($q) => $q->whereIn('status', ['passing', 'failed'])->latest()->limit(10),
             ]);
         }
 
