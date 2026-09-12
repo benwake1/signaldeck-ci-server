@@ -48,6 +48,12 @@ class TestSuitesRelationManager extends RelationManager
                 ->label('Branch Override')
                 ->placeholder('Leave blank to use project default'),
 
+            Forms\Components\TextInput::make('base_url')
+                ->label('Base URL')
+                ->url()
+                ->placeholder('https://example.com')
+                ->helperText('The live site this suite tests against. Required for automated repair to verify a proposed fix.'),
+
             Forms\Components\TextInput::make('timeout_minutes')
                 ->label('Timeout (minutes)')
                 ->numeric()
@@ -268,7 +274,11 @@ class TestSuitesRelationManager extends RelationManager
                         $baseUrl = AiTestBuilderPage::getUrl();
                         $params = ['project_id' => $record->project_id];
 
+                        // Excludes automated-repair conversations (user_id null, see
+                        // TestRepairService) so a repair proposal never silently
+                        // hijacks this link away from the reviewer's own conversation.
                         $conversation = AiConversation::where('test_suite_id', $record->id)
+                            ->whereNotNull('user_id')
                             ->latest()
                             ->first();
                         if ($conversation) {

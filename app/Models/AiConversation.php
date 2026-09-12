@@ -10,6 +10,7 @@
 namespace App\Models;
 
 use App\Enums\ConversationStatus;
+use App\Enums\VerificationStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,14 +28,19 @@ class AiConversation extends Model
         'title',
         'messages',
         'crawl_data',
+        'recording_data',
         'framework',
         'status',
+        'verification_status',
+        'verification_output',
     ];
 
     protected $casts = [
-        'messages'   => 'array',
-        'crawl_data' => 'array',
-        'status'     => ConversationStatus::class,
+        'messages'             => 'array',
+        'crawl_data'           => 'array',
+        'recording_data'       => 'array',
+        'status'               => ConversationStatus::class,
+        'verification_status'  => VerificationStatus::class,
     ];
 
     protected static function booted(): void

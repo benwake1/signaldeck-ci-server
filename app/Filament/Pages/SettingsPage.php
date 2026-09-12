@@ -40,6 +40,7 @@ class SettingsPage extends Page
     {
         $this->form->fill([
             'notifications_enabled' => AppSetting::get('notifications_enabled', '1') === '1',
+            'auto_repair_enabled'   => AppSetting::get('auto_repair_enabled', '0') === '1',
             's3_bucket'             => AppSetting::get('s3_bucket'),
             's3_region'             => AppSetting::get('s3_region'),
             's3_key'                => AppSetting::get('s3_key'),
@@ -62,6 +63,16 @@ class SettingsPage extends Page
                             ->label('Send email notifications when a test run completes')
                             ->helperText('Emails are sent to the user who triggered the test run.')
                             ->default(true),
+                    ]),
+
+                Forms\Components\Section::make('Automated Repair')
+                    ->icon('heroicon-o-wrench-screwdriver')
+                    ->description('When a managed suite\'s health drops below its threshold, propose an AI-generated fix for human review. Never merged automatically.')
+                    ->schema([
+                        Forms\Components\Toggle::make('auto_repair_enabled')
+                            ->label('Attempt automatic repair on suite health breach')
+                            ->helperText('Only applies to managed suites with a base URL configured. At most one attempt per suite per 24 hours.')
+                            ->default(false),
                     ]),
 
                 Forms\Components\Section::make('S3 / Remote Storage')
@@ -98,6 +109,7 @@ class SettingsPage extends Page
         $data = $this->form->getState();
 
         AppSetting::set('notifications_enabled', $data['notifications_enabled'] ? '1' : '0');
+        AppSetting::set('auto_repair_enabled', $data['auto_repair_enabled'] ? '1' : '0');
 
         if (!empty($data['s3_bucket'])) {
             AppSetting::set('s3_bucket',         $data['s3_bucket']);

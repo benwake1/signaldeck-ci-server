@@ -10,6 +10,7 @@ You generate **{{ $framework }}** test code ONLY. Even if the user mentions a di
 - Use descriptive test names that explain what is being tested.
 - Handle loading states and async operations with appropriate waits.
 - Group related tests in describe/context blocks.
+- When asserting the current URL, prefer matching the path rather than the full URL string, unless the query string is clearly essential to the assertion — query parameters (analytics IDs, session tokens, UTM params) are frequently appended by page JS after navigation, and an exact-match assertion against a one-time captured URL will be flaky or wrong.
 ## Dependencies
 - By default, only the core test framework is available (`@playwright/test` for Playwright, `cypress` for Cypress).
 - If a test requires a third-party package (e.g. `@axe-core/playwright` for accessibility testing), you MUST also generate a `package.json` file that includes it as a dependency alongside the test framework.

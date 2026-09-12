@@ -11,10 +11,14 @@ namespace App\Filament\Pages;
 
 use App\DTOs\AiGenerationResult;
 use App\Enums\ConversationStatus;
+use App\Enums\RecordingStatus;
 use App\Enums\SourceType;
+use App\Enums\VerificationStatus;
+use App\Jobs\VerifyGeneratedTestJob;
 use App\Models\AiConversation;
 use App\Models\ManagedTestFile;
 use App\Models\Project;
+use App\Models\TestRecordingSession;
 use App\Models\TestSuite;
 use App\Models\AppSetting;
 use App\Services\AiTestGeneratorService;
@@ -45,6 +49,15 @@ class AiTestBuilderPage extends Page
     public array $generatedFiles = [];
     public array $chatMessages = [];
     public string $suiteName = '';
+    public ?string $verificationStatus = null;
+    public ?string $verificationLabel = null;
+    public ?string $verificationOutput = null;
+    public array $envVarsNeeded = [];
+
+    public ?int $recordingSessionId = null;
+    public ?string $recordingToken = null;
+    public ?string $recordingStatus = null;
+    public int $recordingStepCount = 0;
 
     public static function canAccess(): bool
     {
@@ -92,8 +105,12 @@ class AiTestBuilderPage extends Page
             return [];
         }
 
+        // Includes automated-repair conversations (user_id null, created by
+        // TestRepairService against a health-breached suite) alongside the
+        // viewer's own — otherwise the only way back to one is the one-time
+        // admin notification email.
         return AiConversation::where('project_id', $this->projectId)
-            ->where('user_id', auth()->id())
+            ->where(fn ($q) => $q->where('user_id', auth()->id())->orWhereNull('user_id'))
             ->orderByDesc('updated_at')
             ->limit(20)
             ->get()
@@ -102,6 +119,7 @@ class AiTestBuilderPage extends Page
                 'title' => $c->title ?: 'Untitled conversation',
                 'status' => $c->status->value,
                 'updated_at' => $c->updated_at->diffForHumans(),
+                'is_repair' => $c->user_id === null,
             ])
             ->toArray();
     }
@@ -120,6 +138,9 @@ class AiTestBuilderPage extends Page
         $this->preloadedSuiteId = null;
         $this->chatMessages = [];
         $this->generatedFiles = [];
+        $this->envVarsNeeded = [];
+        $this->applyVerificationState(null);
+        $this->resetRecordingState();
 
         $project = Project::find($projectId);
         if ($project) {
@@ -133,17 +154,23 @@ class AiTestBuilderPage extends Page
         $this->preloadedSuiteId = null;
         $this->chatMessages = [];
         $this->generatedFiles = [];
+        $this->envVarsNeeded = [];
         $this->userMessage = '';
         $this->crawlUrl = '';
         $this->suiteName = '';
         $this->isCrawling = false;
         $this->isGenerating = false;
+        $this->applyVerificationState(null);
+        $this->resetRecordingState();
     }
 
     public function deleteConversation(string $ulid): void
     {
+        // Also permits deleting an automated-repair conversation (user_id
+        // null) once it's been reviewed — same as any other conversation
+        // shown in the sidebar (see getConversationsProperty()).
         $conversation = AiConversation::where('ulid', $ulid)
-            ->where('user_id', auth()->id())
+            ->where(fn ($q) => $q->where('user_id', auth()->id())->orWhereNull('user_id'))
             ->first();
 
         if (!$conversation) {
@@ -204,6 +231,13 @@ class AiTestBuilderPage extends Page
         $this->framework = $conversation->framework ?? $conversation->project?->runner_type?->value ?? 'cypress';
         $this->chatMessages = $conversation->messages ?? [];
         $this->rebuildFilesFromMessages();
+        $this->applyVerificationState($conversation);
+        $this->resetRecordingState();
+
+        $session = TestRecordingSession::where('ai_conversation_id', $conversation->id)->latest()->first();
+        if ($session) {
+            $this->applyRecordingState($session);
+        }
 
         $this->dispatch('scroll-chat');
     }
@@ -227,6 +261,7 @@ class AiTestBuilderPage extends Page
         foreach ($suite->managedTestFiles as $file) {
             $this->generatedFiles[$file->file_path] = $file->content;
         }
+        $this->envVarsNeeded = $this->extractEnvVarNames($this->generatedFiles);
 
         if (empty($this->generatedFiles)) {
             $this->chatMessages = [
@@ -299,6 +334,7 @@ class AiTestBuilderPage extends Page
 
             $this->chatMessages = $conversation->fresh()->messages ?? [];
             $this->mergeGeneratedFiles($result);
+            $this->dispatchVerification($conversation, $result);
 
             $this->dispatch('scroll-chat');
 
@@ -407,6 +443,7 @@ class AiTestBuilderPage extends Page
 
             $this->chatMessages = $conversation->fresh()->messages ?? [];
             $this->mergeGeneratedFiles($result);
+            $this->dispatchVerification($conversation, $result);
 
             $this->dispatch('scroll-chat');
 
@@ -438,6 +475,16 @@ class AiTestBuilderPage extends Page
         }
 
         $conversation = $this->getConversation();
+
+        if ($conversation && $conversation->fresh()->verification_status === VerificationStatus::Pending) {
+            Notification::make()
+                ->title('Verification is still running')
+                ->body('Try again in a moment.')
+                ->warning()
+                ->send();
+            return;
+        }
+
         $existingSuite = $this->linkedSuite;
 
         try {
@@ -555,6 +602,72 @@ class AiTestBuilderPage extends Page
         foreach ($result->files as $path => $content) {
             $this->generatedFiles[$path] = $content;
         }
+        $this->envVarsNeeded = $this->extractEnvVarNames($this->generatedFiles);
+    }
+
+    /**
+     * @param array<string, string> $files
+     * @return string[]
+     */
+    private function extractEnvVarNames(array $files): array
+    {
+        $names = [];
+
+        foreach ($files as $content) {
+            if (preg_match_all('/process\.env\.([A-Z0-9_]+)/', $content, $matches)) {
+                array_push($names, ...$matches[1]);
+            }
+            if (preg_match_all('/Cypress\.env\([\'"]([A-Z0-9_]+)[\'"]\)/', $content, $matches)) {
+                array_push($names, ...$matches[1]);
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    private function dispatchVerification(AiConversation $conversation, AiGenerationResult $result): void
+    {
+        if (empty($result->files)) {
+            return;
+        }
+
+        $conversation->update([
+            'verification_status' => VerificationStatus::Pending,
+            'verification_output' => null,
+        ]);
+
+        $this->applyVerificationState($conversation->fresh());
+
+        VerifyGeneratedTestJob::dispatch($conversation, $result->files, $this->framework);
+    }
+
+    public function refreshVerificationStatus(): void
+    {
+        $conversation = $this->getConversation();
+        $this->applyVerificationState($conversation);
+
+        // The repair loop in VerifyGeneratedTestJob runs on the queue and,
+        // on a failed run, appends new turns to $conversation->messages with
+        // corrected code — but this page's own $this->generatedFiles (what
+        // "Save as managed suite" actually writes) was captured at dispatch
+        // time and never saw those turns. Without this, a suite verified as
+        // "passed" could still get saved with the pre-repair, still-broken
+        // code, silently contradicting its own verified badge. Resync
+        // whenever the queue has appended messages since we last checked.
+        $freshMessages = $conversation?->messages ?? [];
+        if (count($freshMessages) !== count($this->chatMessages)) {
+            $this->chatMessages = $freshMessages;
+            $this->rebuildFilesFromMessages();
+        }
+    }
+
+    private function applyVerificationState(?AiConversation $conversation): void
+    {
+        $status = $conversation?->verification_status;
+
+        $this->verificationStatus = $status?->value;
+        $this->verificationLabel = $status?->label();
+        $this->verificationOutput = $conversation?->verification_output;
     }
 
     private function rebuildFilesFromMessages(): void
@@ -572,6 +685,144 @@ class AiTestBuilderPage extends Page
             foreach ($matches as $match) {
                 $this->generatedFiles[trim($match[1])] = trim($match[2]);
             }
+        }
+
+        $this->envVarsNeeded = $this->extractEnvVarNames($this->generatedFiles);
+    }
+
+    public function startRecording(): void
+    {
+        if (!$this->projectId) {
+            Notification::make()->title('Please select a project first')->warning()->send();
+            return;
+        }
+
+        $session = TestRecordingSession::create([
+            'project_id' => $this->projectId,
+            'ai_conversation_id' => $this->getConversation()?->id,
+            'status' => RecordingStatus::Recording,
+            'expires_at' => now()->addHours(2),
+        ]);
+
+        $this->applyRecordingState($session);
+    }
+
+    public function refreshRecordingStatus(): void
+    {
+        if (!$this->recordingSessionId) {
+            return;
+        }
+
+        $session = TestRecordingSession::find($this->recordingSessionId);
+        if ($session) {
+            $this->applyRecordingState($session);
+        }
+    }
+
+    public function generateFromRecording(): void
+    {
+        if (!$this->recordingSessionId) {
+            return;
+        }
+
+        $session = TestRecordingSession::find($this->recordingSessionId);
+        if (!$session || $session->status !== RecordingStatus::Completed) {
+            Notification::make()->title('Recording is not finished yet')->warning()->send();
+            return;
+        }
+
+        if (empty($session->actions)) {
+            Notification::make()->title('No actions were recorded')->warning()->send();
+            return;
+        }
+
+        $this->isGenerating = true;
+
+        try {
+            $conversation = $this->getConversation();
+            $isNew = !$conversation;
+
+            if ($isNew) {
+                $project = Project::find($this->projectId);
+                $conversation = AiConversation::create([
+                    'user_id' => auth()->id(),
+                    'project_id' => $this->projectId,
+                    'title' => 'Recorded flow: ' . ($session->actions[0]['url'] ?? 'untitled'),
+                    'messages' => [],
+                    'crawl_data' => $project?->crawl_data,
+                    'recording_data' => $session->actions,
+                    'framework' => $this->framework,
+                    'status' => ConversationStatus::Active,
+                ]);
+                $this->conversationUlid = $conversation->ulid;
+            } else {
+                $conversation->update(['recording_data' => $session->actions]);
+            }
+
+            $session->update(['ai_conversation_id' => $conversation->id]);
+
+            $generator = app(AiTestGeneratorService::class);
+            $message = 'Generate a ' . $this->framework . ' test that replays the recorded flow above, step by step, using the exact selectors given.';
+
+            $result = $isNew
+                ? $generator->generate($conversation, $message, $this->framework)
+                : $generator->refine($conversation, $message, $this->framework);
+
+            $this->chatMessages = $conversation->fresh()->messages ?? [];
+            $this->mergeGeneratedFiles($result);
+            $this->dispatchVerification($conversation, $result);
+
+            $this->dispatch('scroll-chat');
+
+            Notification::make()->title('Test generated from recording')->success()->send();
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()->title($e->getMessage())->warning()->send();
+        } catch (\Throwable $e) {
+            Log::error('Generation from recording failed', ['error' => $e->getMessage()]);
+            Notification::make()
+                ->title('Generation failed')
+                ->body('An error occurred. Please try again.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isGenerating = false;
+        }
+    }
+
+    private function applyRecordingState(TestRecordingSession $session): void
+    {
+        $this->recordingSessionId = $session->id;
+        $this->recordingToken = $session->token;
+        $this->recordingStatus = $session->isExpired() ? RecordingStatus::Expired->value : $session->status->value;
+        $this->recordingStepCount = count($session->actions ?? []);
+
+        // Tells the Flow Recorder browser extension (via content-bridge.js
+        // on this page) which session to capture into. The extension then
+        // keeps recording across every page navigation on the target site
+        // with no further action here — see browser-extension/README.md.
+        if ($this->recordingStatus === RecordingStatus::Recording->value) {
+            $this->dispatch(
+                'signaldeck-recording-started',
+                token: $session->token,
+                apiBase: url('/'),
+                expiresAt: $session->expires_at->timestamp * 1000,
+            );
+        } else {
+            $this->dispatch('signaldeck-recording-stopped');
+        }
+    }
+
+    private function resetRecordingState(): void
+    {
+        $hadActiveRecording = $this->recordingStatus === RecordingStatus::Recording->value;
+
+        $this->recordingSessionId = null;
+        $this->recordingToken = null;
+        $this->recordingStatus = null;
+        $this->recordingStepCount = 0;
+
+        if ($hadActiveRecording) {
+            $this->dispatch('signaldeck-recording-stopped');
         }
     }
 }

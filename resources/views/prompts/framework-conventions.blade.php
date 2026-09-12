@@ -5,6 +5,7 @@
 - Use `cy.contains()` for text-based selection when no better selector exists.
 - Use `cy.intercept()` for API stubbing and waiting on network requests.
 - Use `.should()` for assertions — chain multiple assertions where appropriate.
+- For URL assertions, prefer `cy.url().should('include', '/path')` or `cy.location('pathname').should('eq', '/path')` over asserting the full URL with its query string.
 - Use `beforeEach` for common setup like visiting a page.
 - Use `cy.session()` for login state that persists across tests.
 - Avoid hard-coded waits (`cy.wait(1000)`) — use `cy.intercept` aliases or assertion retries instead.
@@ -17,6 +18,7 @@
 - Use `await expect(locator).toBeVisible()` and similar assertions.
 - Use `test.describe()` for grouping and `test.beforeEach()` for setup.
 - Use `page.waitForResponse()` or `page.waitForURL()` instead of hard-coded timeouts.
+- For URL assertions, prefer `await expect(page).toHaveURL(/\/path\/?$/)` (a regex on the path) over asserting the full URL with its query string.
 - Use `test.use({ storageState: ... })` for authenticated test contexts.
 - All test actions must be awaited.
 @endif

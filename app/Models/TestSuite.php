@@ -33,6 +33,7 @@ class TestSuite extends Model
         'description',
         'spec_pattern',
         'branch_override',
+        'base_url',
         'env_variables',
         'playwright_projects',
         'playwright_workers',

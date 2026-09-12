@@ -16,6 +16,7 @@ use App\Models\TestRun;
 use App\Services\MochawesomeParserService;
 use App\Services\ReportGeneratorService;
 use App\Services\S3ConfigService;
+use App\Support\ChromiumBinaryResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -131,7 +132,7 @@ class RunCypressTestJob implements ShouldQueue
 
         $specPattern = $this->run->spec_override ?? $suite->spec_pattern;
         $reporterFlags = '--reporter mochawesome --reporter-options "reportDir=mochawesome-report,overwrite=false,html=false,json=true"';
-        $browser = $this->resolveChromiumBinary();
+        $browser = ChromiumBinaryResolver::resolve();
         $browserFlag = $browser ? '--browser ' . escapeshellarg($browser) : '';
         $configFlags = '--config experimentalMemoryManagement=true,numTestsKeptInMemory=0,videoCompression=20';
         // xvfb-run is required on headless Linux (Docker or standalone server).
@@ -145,16 +146,6 @@ class RunCypressTestJob implements ShouldQueue
         $this->log("   Spec pattern: {$specPattern}");
 
         return $this->streamProcess($cmd);
-    }
-
-    private function resolveChromiumBinary(): ?string
-    {
-        foreach (['/usr/local/bin/chrome-cypress', '/usr/bin/google-chrome-stable'] as $path) {
-            if (file_exists($path) && is_executable($path)) {
-                return $path;
-            }
-        }
-        return null;
     }
 
     private function mergeMochawesomeReports(): string

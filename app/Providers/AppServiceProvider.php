@@ -15,7 +15,9 @@ use App\Observers\TestRunObserver;
 use App\Services\S3ConfigService;
 use App\Services\SlackService;
 use App\Services\SsoConfigService;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -49,6 +51,13 @@ class AppServiceProvider extends ServiceProvider
 
         $this->applyMailSettings();
         $this->applySsoSettings();
+
+        // Recorded flow actions post one request per user interaction, keyed
+        // by the recording token rather than IP — the browser making these
+        // requests is on the client's site, not ours.
+        RateLimiter::for('recording-actions', function ($request) {
+            return Limit::perMinute(120)->by($request->route('token'));
+        });
     }
 
     private function applyMailSettings(): void

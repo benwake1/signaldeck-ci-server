@@ -10,6 +10,7 @@
 namespace App\Services;
 
 use App\DTOs\CrawlResult;
+use App\Support\UrlSafetyValidator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
@@ -17,7 +18,7 @@ class SiteCrawlerService
 {
     public function crawl(string $url, array $options = []): CrawlResult
     {
-        $this->validateUrl($url);
+        UrlSafetyValidator::validate($url);
 
         $timeout = $options['timeout'] ?? 30000;
         $nodePath = env('NODE_PATH', 'node');
@@ -46,29 +47,5 @@ class SiteCrawlerService
         }
 
         return CrawlResult::fromArray($data);
-    }
-
-    private function validateUrl(string $url): void
-    {
-        $parsed = parse_url($url);
-
-        if (!$parsed || !isset($parsed['scheme'], $parsed['host'])) {
-            throw new \InvalidArgumentException('Invalid URL provided');
-        }
-
-        if (!in_array($parsed['scheme'], ['http', 'https'], true)) {
-            throw new \InvalidArgumentException('URL must use http or https');
-        }
-
-        $host = strtolower($parsed['host']);
-
-        $blocked = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
-        if (in_array($host, $blocked, true)) {
-            throw new \InvalidArgumentException('Cannot crawl localhost or loopback addresses');
-        }
-
-        if (preg_match('/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/', $host)) {
-            throw new \InvalidArgumentException('Cannot crawl private network addresses');
-        }
     }
 }

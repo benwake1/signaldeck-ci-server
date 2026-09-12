@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "SignalDeck Flow Recorder",
+  "version": "1.0.0",
+  "description": "Records multi-step flows for the SignalDeck AI Test Builder — replaces the bookmarklet so recording survives page navigation.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://cypress-dashboard-new.test/*",
+        "https://*.signaldeck.app/*"
+      ],
+      "js": ["content-bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-recorder.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

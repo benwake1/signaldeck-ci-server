@@ -166,6 +166,12 @@
                                     'bg-blue-500' => $conv['status'] === 'completed',
                                     'bg-red-500' => $conv['status'] === 'failed',
                                 ])></span>
+                                @if($conv['is_repair'] ?? false)
+                                    <x-heroicon-m-wrench-screwdriver
+                                        class="shrink-0 w-3 h-3 text-warning-500"
+                                        title="Automated repair proposal — not merged, review before accepting"
+                                    />
+                                @endif
                                 <span
                                     wire:click="loadConversation('{{ $conv['ulid'] }}')"
                                     @click="showSidebar = false"
@@ -243,6 +249,18 @@
 
                     @if($projectId)
                         <div class="flex items-center gap-3">
+                            {{-- Record a Flow --}}
+                            @if(!$recordingToken)
+                                <button
+                                    wire:click="startRecording"
+                                    class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900 transition"
+                                    title="Record yourself performing a real multi-step flow on the live site"
+                                >
+                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                    Record a Flow
+                                </button>
+                            @endif
+
                             {{-- Code panel toggle (when files exist but panel is hidden) --}}
                             @if(!empty($generatedFiles))
                                 <button
@@ -270,6 +288,56 @@
                         </div>
                     @endif
                 </div>
+
+                {{-- Recording panel --}}
+                @if($projectId && $recordingToken)
+                    <div
+                        @if($recordingStatus === 'recording') wire:poll.3s="refreshRecordingStatus" @endif
+                        class="mx-4 mt-3 px-3 py-3 rounded-lg text-xs bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 space-y-2"
+                    >
+                        @if($recordingStatus === 'recording')
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="font-medium">🔴 Recording — {{ $recordingStepCount }} step(s) captured</div>
+                            </div>
+                            <p class="opacity-90">
+                                The Flow Recorder extension is now armed. Switch to the live site and start clicking through the flow —
+                                it captures automatically on every page, including after navigating to a new domain (e.g. a payment gateway).
+                                No need to click anything per page. Open the extension icon and choose
+                                <strong>Stop &amp; save recording</strong> when the flow is done.
+                            </p>
+                            <p class="text-[.65rem] opacity-70">
+                                Don't have the extension installed yet? See
+                                <code class="px-1 py-0.5 rounded bg-rose-100 dark:bg-rose-900/50">browser-extension/README.md</code> for install steps.
+                                Password fields are never captured — their values stay in your browser.
+                            </p>
+                        @elseif($recordingStatus === 'completed')
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="font-medium">✅ Recording saved — {{ $recordingStepCount }} step(s)</div>
+                                <button
+                                    wire:click="generateFromRecording"
+                                    class="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-500 transition disabled:opacity-50"
+                                >
+                                    <span wire:loading.remove wire:target="generateFromRecording">Generate test from recording</span>
+                                    <span wire:loading wire:target="generateFromRecording">Generating…</span>
+                                </button>
+                            </div>
+                        @else
+                            <div class="font-medium">⚠️ Recording session expired — start a new recording.</div>
+                        @endif
+                    </div>
+                @endif
+
+                {{-- Env vars needed callout --}}
+                @if(!empty($envVarsNeeded))
+                    <div class="mx-4 mt-3 px-3 py-2 rounded-lg text-xs bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300">
+                        This test references {{ count($envVarsNeeded) === 1 ? 'an environment variable' : 'environment variables' }}
+                        that {{ count($envVarsNeeded) === 1 ? "isn't" : "aren't" }} set yet:
+                        @foreach($envVarsNeeded as $name)
+                            <code class="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50">{{ $name }}</code>@if(!$loop->last), @endif
+                        @endforeach
+                        — add {{ count($envVarsNeeded) === 1 ? 'it' : 'them' }} under the project's Environment Variables before running.
+                    </div>
+                @endif
 
                 @if(!$projectId)
                     {{-- No project selected — full-panel prompt --}}
@@ -491,6 +559,35 @@
                         </div>
                     </div>
 
+                    {{-- Verification status --}}
+                    @if($verificationStatus)
+                        <div
+                            @if($verificationStatus === 'pending') wire:poll.3s="refreshVerificationStatus" @endif
+                            class="mx-4 mt-3 px-3 py-2 rounded-lg text-xs font-medium flex items-start gap-2
+                                @if($verificationStatus === 'passed') bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400
+                                @elseif($verificationStatus === 'pending') bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400
+                                @else bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400
+                                @endif"
+                        >
+                            @if($verificationStatus === 'pending')
+                                <svg class="w-3.5 h-3.5 mt-0.5 flex-shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                            @elseif($verificationStatus === 'passed')
+                                <x-heroicon-s-check-circle class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            @else
+                                <x-heroicon-s-exclamation-triangle class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            @endif
+                            <div class="flex-1 min-w-0">
+                                <div>{{ $verificationLabel }}</div>
+                                @if($verificationOutput && $verificationStatus !== 'passed' && $verificationStatus !== 'pending')
+                                    <pre class="mt-1 whitespace-pre-wrap break-words text-[.65rem] opacity-80 max-h-24 overflow-y-auto">{{ \Illuminate\Support\Str::limit($verificationOutput, 600) }}</pre>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
                     <div x-data="{ activeFile: '{{ array_key_first($generatedFiles) }}' }" class="flex flex-col flex-1 overflow-hidden">
                         {{-- File tabs --}}
                         <div class="flex flex-wrap gap-0 px-4 pt-3 overflow-x-auto">
@@ -522,9 +619,11 @@
                                 </div>
                                 <button
                                     wire:click="saveAsSuite"
-                                    class="px-3 py-2 text-sm font-medium text-white bg-success-600 rounded-lg hover:bg-success-500 transition"
+                                    @disabled($verificationStatus === 'pending')
+                                    title="{{ $verificationStatus === 'pending' ? 'Verification is still running' : '' }}"
+                                    class="px-3 py-2 text-sm font-medium text-white bg-success-600 rounded-lg hover:bg-success-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <span wire:loading.remove wire:target="saveAsSuite">Update Suite</span>
+                                    <span wire:loading.remove wire:target="saveAsSuite">{{ $verificationStatus === 'pending' ? 'Verifying…' : 'Update Suite' }}</span>
                                     <span wire:loading wire:target="saveAsSuite">Updating...</span>
                                 </button>
                             </div>
@@ -539,9 +638,11 @@
                                 />
                                 <button
                                     wire:click="saveAsSuite"
-                                    class="px-3 py-2 text-sm font-medium text-white bg-success-600 rounded-lg hover:bg-success-500 transition"
+                                    @disabled($verificationStatus === 'pending')
+                                    title="{{ $verificationStatus === 'pending' ? 'Verification is still running' : '' }}"
+                                    class="px-3 py-2 text-sm font-medium text-white bg-success-600 rounded-lg hover:bg-success-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Save
+                                    {{ $verificationStatus === 'pending' ? 'Verifying…' : 'Save' }}
                                 </button>
                             </div>
                         @endif
@@ -632,13 +733,30 @@
         }
 
         document.addEventListener('livewire:init', () => {
+            // Background wire:poll ticks (verification/recording status)
+            // re-render the whole component every few seconds and touch
+            // #chat-messages even when nothing in the chat changed — only
+            // force-scroll on those if the user was already at the bottom,
+            // so reading an older message isn't interrupted by polling.
+            let stickToBottom = true;
+
+            document.addEventListener('scroll', (e) => {
+                const el = document.getElementById('chat-messages');
+                if (!el || e.target !== el) return;
+                stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            }, true);
+
             Livewire.hook('morph.updated', ({el}) => {
-                if (el.id === 'chat-messages') {
+                if (el.id === 'chat-messages' && stickToBottom) {
                     el.scrollTop = el.scrollHeight;
                 }
             });
 
+            // An explicit scroll-chat dispatch means the user just did
+            // something (sent a message, generated, converted frameworks) —
+            // always jump to bottom for that, regardless of scroll position.
             Livewire.on('scroll-chat', () => {
+                stickToBottom = true;
                 setTimeout(() => {
                     const el = document.getElementById('chat-messages');
                     if (el) el.scrollTop = el.scrollHeight;

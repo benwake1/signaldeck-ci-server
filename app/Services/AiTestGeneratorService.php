@@ -37,7 +37,7 @@ class AiTestGeneratorService
     {
         $this->validateInput($userMessage);
 
-        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data);
+        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
 
         $messages = $conversation->messages ?? [];
         $messages[] = ['role' => 'user', 'content' => $userMessage, 'timestamp' => now()->toIso8601String()];
@@ -54,7 +54,7 @@ class AiTestGeneratorService
     {
         $this->validateInput($feedback);
 
-        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data);
+        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
 
         $messages = $conversation->messages ?? [];
         $messages[] = ['role' => 'user', 'content' => $feedback, 'timestamp' => now()->toIso8601String()];
@@ -69,7 +69,7 @@ class AiTestGeneratorService
 
     public function regenerateForFramework(AiConversation $conversation, string $targetFramework): AiGenerationResult
     {
-        $systemBlocks = $this->buildSystemBlocks($targetFramework, $conversation->crawl_data);
+        $systemBlocks = $this->buildSystemBlocks($targetFramework, $conversation->crawl_data, $conversation->recording_data);
 
         $messages = $conversation->messages ?? [];
         $messages[] = [
@@ -101,7 +101,7 @@ class AiTestGeneratorService
     {
         $this->validateInput($userMessage);
 
-        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data);
+        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
 
         $messages = $conversation->messages ?? [];
         $messages[] = ['role' => 'user', 'content' => $userMessage, 'timestamp' => now()->toIso8601String()];
@@ -170,15 +170,15 @@ class AiTestGeneratorService
      * The base prompt (framework conventions) is cached; crawl data is appended
      * only when present and marked as the cache breakpoint.
      */
-    private function buildSystemBlocks(string $framework, ?array $crawlData): array
+    private function buildSystemBlocks(string $framework, ?array $crawlData, ?array $recordingData = null): array
     {
         $basePrompt = View::make('prompts.test-generator-system', [
             'framework' => $framework,
             'crawlData' => [],
         ])->render();
 
-        // If no crawl data, cache the base prompt alone
-        if (empty($crawlData)) {
+        // If no crawl or recording data, cache the base prompt alone
+        if (empty($crawlData) && empty($recordingData)) {
             return [
                 [
                     'type' => 'text',
@@ -188,20 +188,35 @@ class AiTestGeneratorService
             ];
         }
 
-        // With crawl data: base prompt + crawl data (cache breakpoint on crawl
-        // since it's stable across turns within the same conversation)
-        $crawlPrompt = View::make('prompts.crawl-context', [
-            'crawlData' => $crawlData,
-        ])->render();
+        $blocks = [['type' => 'text', 'text' => $basePrompt]];
 
-        return [
-            ['type' => 'text', 'text' => $basePrompt],
-            [
+        // Crawl data and recording data are each stable across turns within
+        // the same conversation, so each gets its own cache breakpoint.
+        if (!empty($crawlData)) {
+            $crawlPrompt = View::make('prompts.crawl-context', [
+                'crawlData' => $crawlData,
+            ])->render();
+
+            $blocks[] = [
                 'type' => 'text',
                 'text' => $crawlPrompt,
                 'cache_control' => ['type' => 'ephemeral'],
-            ],
-        ];
+            ];
+        }
+
+        if (!empty($recordingData)) {
+            $recordingPrompt = View::make('prompts.recording-context', [
+                'recordingData' => $recordingData,
+            ])->render();
+
+            $blocks[] = [
+                'type' => 'text',
+                'text' => $recordingPrompt,
+                'cache_control' => ['type' => 'ephemeral'],
+            ];
+        }
+
+        return $blocks;
     }
 
     private function callApi(array $systemBlocks, array $messages): array

@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+    body { font: 13px system-ui, sans-serif; width: 240px; padding: 14px; color: #111827; }
+    h1 { font-size: 13px; font-weight: 600; margin: 0 0 10px; }
+    .row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+    .dot.live { background: #ef4444; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+    button { width: 100%; font: inherit; background: #2563eb; color: #fff; border: none; padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #9ca3af; cursor: default; }
+    p { margin: 0; color: #6b7280; line-height: 1.4; }
+</style>
+</head>
+<body>
+    <h1>SignalDeck Flow Recorder</h1>
+    <div class="row">
+        <span class="dot" id="dot"></span>
+        <span id="status">Checking…</span>
+    </div>
+    <p id="hint">Start a recording from the AI Test Builder to begin.</p>
+    <button id="stop" hidden>Stop &amp; save recording</button>
+    <script src="popup.js"></script>
+</body>
+</html>
