@@ -80,3 +80,5 @@ Homestead.yaml
 # Claude Code
 # -----------------------------------------------
 .claude/
+
+/SignalDeckCI Screenshots/
