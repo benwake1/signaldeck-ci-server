@@ -22,6 +22,7 @@ class AppSetting extends Model
 
     private const SECRET_KEYS = [
         'ai_anthropic_api_key',
+        'ai_compat_api_key',
         'mail_password',
         'sso_google_client_secret',
         'sso_github_client_secret',

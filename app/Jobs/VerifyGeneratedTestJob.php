@@ -11,6 +11,7 @@ namespace App\Jobs;
 
 use App\Enums\VerificationStatus;
 use App\Models\AiConversation;
+use App\Models\AppSetting;
 use App\Services\AiTestGeneratorService;
 use App\Services\TestExecutionService;
 use Illuminate\Bus\Queueable;
@@ -33,7 +34,7 @@ class VerifyGeneratedTestJob implements ShouldQueue
     public int $timeout = 600;
     public int $tries = 1;
 
-    private const MAX_ATTEMPTS = 3;
+    private const DEFAULT_MAX_ATTEMPTS = 2;
 
     /**
      * @param array<string, string> $files Path => code, for every file from this generation turn.
@@ -83,8 +84,10 @@ class VerifyGeneratedTestJob implements ShouldQueue
         }
 
         $currentFiles = $filesToVerify;
+        // Each extra attempt is a paid AI call, so the cap is configurable (Settings > AI).
+        $maxAttempts = max(1, (int) AppSetting::get('ai_verify_max_attempts', self::DEFAULT_MAX_ATTEMPTS));
 
-        for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             $failures = [];
 
             foreach ($currentFiles as $path => $code) {
@@ -102,7 +105,7 @@ class VerifyGeneratedTestJob implements ShouldQueue
                 return;
             }
 
-            if ($attempt === self::MAX_ATTEMPTS) {
+            if ($attempt === $maxAttempts) {
                 $conversation->update([
                     'verification_status' => VerificationStatus::FailedUnverified,
                     'verification_output' => collect($failures)

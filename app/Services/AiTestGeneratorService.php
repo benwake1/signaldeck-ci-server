@@ -12,17 +12,18 @@ namespace App\Services;
 use App\DTOs\AiGenerationResult;
 use App\Models\AiConversation;
 use App\Models\AppSetting;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Http;
+use App\Services\Ai\AiProvider;
+use App\Services\Ai\AiProviderFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 
 class AiTestGeneratorService
 {
-    private const API_URL = 'https://api.anthropic.com/v1/messages';
-    private const API_VERSION = '2023-06-01';
     private const DEFAULT_MAX_TOKENS = 4096;
     private const MAX_RECENT_MESSAGES = 4; // Keep last N messages (2 exchanges) for context
+
+    /** A fenced code block tagged with a target path, e.g. ```javascript file:cypress/e2e/login.cy.js */
+    private const FILE_BLOCK_REGEX = '/```[a-z]*[ \t]+file:[ \t]*(.+?)\r?\n(.*?)```/s';
 
     private static array $offTopicPatterns = [
         '/write me a (poem|story|essay|song|letter)/i',
@@ -33,57 +34,29 @@ class AiTestGeneratorService
         '/help me with (my )?(homework|resume|cover letter)/i',
     ];
 
+    public function __construct(private ?AiProvider $provider = null) {}
+
     public function generate(AiConversation $conversation, string $userMessage, string $framework = 'cypress'): AiGenerationResult
     {
         $this->validateInput($userMessage);
 
-        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
-
-        $messages = $conversation->messages ?? [];
-        $messages[] = ['role' => 'user', 'content' => $userMessage, 'timestamp' => now()->toIso8601String()];
-
-        $response = $this->callApi($systemBlocks, $messages);
-
-        $messages[] = ['role' => 'assistant', 'content' => $response['content'], 'timestamp' => now()->toIso8601String()];
-        $conversation->update(['messages' => $messages]);
-
-        return $this->parseResponse($response);
+        return $this->run($conversation, $userMessage, $framework);
     }
 
     public function refine(AiConversation $conversation, string $feedback, string $framework = 'cypress'): AiGenerationResult
     {
         $this->validateInput($feedback);
 
-        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
-
-        $messages = $conversation->messages ?? [];
-        $messages[] = ['role' => 'user', 'content' => $feedback, 'timestamp' => now()->toIso8601String()];
-
-        $response = $this->callApi($systemBlocks, $messages);
-
-        $messages[] = ['role' => 'assistant', 'content' => $response['content'], 'timestamp' => now()->toIso8601String()];
-        $conversation->update(['messages' => $messages]);
-
-        return $this->parseResponse($response);
+        return $this->run($conversation, $feedback, $framework);
     }
 
     public function regenerateForFramework(AiConversation $conversation, string $targetFramework): AiGenerationResult
     {
-        $systemBlocks = $this->buildSystemBlocks($targetFramework, $conversation->crawl_data, $conversation->recording_data);
-
-        $messages = $conversation->messages ?? [];
-        $messages[] = [
-            'role' => 'user',
-            'content' => "Convert the previously generated tests to {$targetFramework} format. Keep the same test scenarios and assertions, but use {$targetFramework} conventions and APIs.",
-            'timestamp' => now()->toIso8601String(),
-        ];
-
-        $response = $this->callApi($systemBlocks, $messages);
-
-        $messages[] = ['role' => 'assistant', 'content' => $response['content'], 'timestamp' => now()->toIso8601String()];
-        $conversation->update(['messages' => $messages]);
-
-        return $this->parseResponse($response);
+        return $this->run(
+            $conversation,
+            "Convert the previously generated tests to {$targetFramework} format. Keep the same test scenarios and assertions, but use {$targetFramework} conventions and APIs.",
+            $targetFramework,
+        );
     }
 
     public function validateInput(string $message): void
@@ -101,68 +74,138 @@ class AiTestGeneratorService
     {
         $this->validateInput($userMessage);
 
+        $provider = $this->provider();
         $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
 
         $messages = $conversation->messages ?? [];
         $messages[] = ['role' => 'user', 'content' => $userMessage, 'timestamp' => now()->toIso8601String()];
 
-        $apiKey = $this->getApiKey();
-        set_time_limit(120);
-
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => self::API_VERSION,
-            'content-type' => 'application/json',
-        ])->timeout(120)->withOptions(['stream' => true])->post(self::API_URL, [
-            'model' => AppSetting::get('ai_model', config('ai.model')),
-            'max_tokens' => (int) AppSetting::get('ai_max_tokens', self::DEFAULT_MAX_TOKENS),
-            'system' => $systemBlocks,
-            'messages' => $this->buildApiMessages($messages),
-            'stream' => true,
-        ]);
-
-        if ($response->failed()) {
-            Log::error('Anthropic streaming API call failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-            throw new \RuntimeException('AI generation failed: ' . $response->status());
-        }
+        [$systemBlocks, $apiMessages] = $this->fitContext($provider, $systemBlocks, $this->buildApiMessages($messages));
 
         $fullContent = '';
-        $body = $response->getBody();
-        $buffer = '';
+        $tokens = [];
 
-        while (!$body->eof()) {
-            $buffer .= $body->read(8192);
-            $lines = explode("\n", $buffer);
-            $buffer = array_pop($lines); // keep incomplete last line in buffer
-
-            foreach ($lines as $line) {
-                $line = trim($line);
-
-                if (empty($line) || !str_starts_with($line, 'data: ')) {
-                    continue;
-                }
-
-                $data = json_decode(substr($line, 6), true);
-                if (!$data) continue;
-
-                if ($data['type'] === 'content_block_delta' && isset($data['delta']['text'])) {
-                    $fullContent .= $data['delta']['text'];
-                    yield ['type' => 'delta', 'text' => $data['delta']['text']];
-                }
-
-                if ($data['type'] === 'message_stop') {
-                    break 2;
-                }
+        foreach ($provider->stream($systemBlocks, $apiMessages, $this->maxTokens()) as $chunk) {
+            if ($chunk['type'] === 'delta') {
+                $fullContent .= $chunk['text'];
+                yield $chunk;
+            } elseif ($chunk['type'] === 'usage') {
+                $tokens = $chunk['tokens_used'];
             }
         }
+
+        $this->logUsage($conversation, $provider, $tokens);
 
         $messages[] = ['role' => 'assistant', 'content' => $fullContent, 'timestamp' => now()->toIso8601String()];
         $conversation->update(['messages' => $messages]);
 
-        yield ['type' => 'done', 'content' => $fullContent];
+        yield ['type' => 'done', 'content' => $fullContent, 'tokens_used' => $tokens];
+    }
+
+    /**
+     * Shared non-streaming turn: append the user message, call the provider,
+     * persist the reply and parse it into files.
+     */
+    private function run(AiConversation $conversation, string $userMessage, string $framework): AiGenerationResult
+    {
+        $provider = $this->provider();
+        $systemBlocks = $this->buildSystemBlocks($framework, $conversation->crawl_data, $conversation->recording_data);
+
+        $messages = $conversation->messages ?? [];
+        $messages[] = ['role' => 'user', 'content' => $userMessage, 'timestamp' => now()->toIso8601String()];
+
+        [$fittedSystem, $apiMessages] = $this->fitContext($provider, $systemBlocks, $this->buildApiMessages($messages));
+        $response = $provider->complete($fittedSystem, $apiMessages, $this->maxTokens());
+
+        // Weaker models sometimes ignore the `file:` fence format. Give them one nudge.
+        if ($provider->name() === AiProviderFactory::OPENAI_COMPATIBLE
+            && !preg_match(self::FILE_BLOCK_REGEX, $response['content'])
+            && str_contains($response['content'], '```')
+        ) {
+            $apiMessages[] = ['role' => 'assistant', 'content' => $response['content']];
+            $apiMessages[] = ['role' => 'user', 'content' => 'Reply again using the required format: wrap every file in a fenced block whose opening line is the language followed by `file:<path>`, e.g. ```javascript file:cypress/e2e/example.cy.js. Include complete files.'];
+
+            $retry = $provider->complete($fittedSystem, $apiMessages, $this->maxTokens());
+            $retry['tokens_used'] = $this->sumTokens($response['tokens_used'], $retry['tokens_used']);
+            $response = $retry;
+        }
+
+        $this->logUsage($conversation, $provider, $response['tokens_used']);
+
+        $messages[] = ['role' => 'assistant', 'content' => $response['content'], 'timestamp' => now()->toIso8601String()];
+        $conversation->update(['messages' => $messages]);
+
+        return $this->parseResponse($response);
+    }
+
+    private function provider(): AiProvider
+    {
+        $provider = $this->provider ?? AiProviderFactory::make();
+
+        if (!$provider->isConfigured()) {
+            throw new \RuntimeException('AI provider not configured. Go to Settings > AI to set one up.');
+        }
+
+        return $provider;
+    }
+
+    private function maxTokens(): int
+    {
+        return (int) AppSetting::get('ai_max_tokens', self::DEFAULT_MAX_TOKENS);
+    }
+
+    private function logUsage(AiConversation $conversation, AiProvider $provider, array $tokens): void
+    {
+        Log::info('AI usage', ['conversation_id' => $conversation->id, 'provider' => $provider->name()] + $tokens);
+
+        // Record which provider/model produced this conversation (the latest one wins
+        // if the admin switches provider mid-conversation).
+        $conversation->update(['provider' => $provider->name(), 'model' => $provider->model()]);
+
+        if (!empty($tokens['total'])) {
+            $conversation->increment('total_tokens', (int) $tokens['total']);
+        }
+    }
+
+    private function sumTokens(array $a, array $b): array
+    {
+        $sum = [];
+        foreach (array_unique(array_merge(array_keys($a), array_keys($b))) as $key) {
+            $sum[$key] = ($a[$key] ?? 0) + ($b[$key] ?? 0);
+        }
+
+        return $sum;
+    }
+
+    /**
+     * Small local models have small context windows. When `ai_max_context_chars`
+     * is set (non-Anthropic providers only), truncate the crawl/recording
+     * blocks so the whole request fits; the base prompt is never touched.
+     *
+     * @return array{0: array, 1: array}
+     */
+    private function fitContext(AiProvider $provider, array $systemBlocks, array $apiMessages): array
+    {
+        $limit = (int) AppSetting::get('ai_max_context_chars', 0);
+        if ($limit <= 0 || $provider->name() === AiProviderFactory::ANTHROPIC) {
+            return [$systemBlocks, $apiMessages];
+        }
+
+        $used = array_sum(array_map(fn ($m) => strlen($m['content']), $apiMessages)) + strlen($systemBlocks[0]['text']);
+
+        foreach ($systemBlocks as $i => $block) {
+            if ($i === 0) {
+                continue;
+            }
+
+            $budget = max(500, $limit - $used);
+            if (strlen($block['text']) > $budget) {
+                $systemBlocks[$i]['text'] = substr($block['text'], 0, $budget) . "\n... (truncated)";
+            }
+            $used += strlen($systemBlocks[$i]['text']);
+        }
+
+        return [$systemBlocks, $apiMessages];
     }
 
     /**
@@ -217,49 +260,6 @@ class AiTestGeneratorService
         }
 
         return $blocks;
-    }
-
-    private function callApi(array $systemBlocks, array $messages): array
-    {
-        $apiKey = $this->getApiKey();
-        set_time_limit(120);
-
-        $response = Http::withHeaders([
-            'x-api-key' => $apiKey,
-            'anthropic-version' => self::API_VERSION,
-            'content-type' => 'application/json',
-        ])->timeout(120)->post(self::API_URL, [
-            'model' => AppSetting::get('ai_model', config('ai.model')),
-            'max_tokens' => (int) AppSetting::get('ai_max_tokens', self::DEFAULT_MAX_TOKENS),
-            'system' => $systemBlocks,
-            'messages' => $this->buildApiMessages($messages),
-        ]);
-
-        if ($response->failed()) {
-            Log::error('Anthropic API call failed', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-            throw new \RuntimeException('AI generation failed: ' . $response->status());
-        }
-
-        $data = $response->json();
-
-        $content = collect($data['content'] ?? [])
-            ->where('type', 'text')
-            ->pluck('text')
-            ->implode('');
-
-        return [
-            'content' => $content,
-            'tokens_used' => [
-                'input' => $data['usage']['input_tokens'] ?? 0,
-                'output' => $data['usage']['output_tokens'] ?? 0,
-                'total' => ($data['usage']['input_tokens'] ?? 0) + ($data['usage']['output_tokens'] ?? 0),
-                'cache_read' => $data['usage']['cache_read_input_tokens'] ?? 0,
-                'cache_creation' => $data['usage']['cache_creation_input_tokens'] ?? 0,
-            ],
-        ];
     }
 
     /**
@@ -334,7 +334,7 @@ class AiTestGeneratorService
         // Walk in reverse so we find the latest version first
         foreach (array_reverse($messages) as $msg) {
             $content = $msg['content'] ?? '';
-            preg_match_all('/```(?:javascript|js|typescript|ts|json)\s+file:(.+?)\n(.*?)```/s', $content, $matches, PREG_SET_ORDER);
+            preg_match_all(self::FILE_BLOCK_REGEX, $content, $matches, PREG_SET_ORDER);
 
             foreach ($matches as $match) {
                 $path = trim($match[1]);
@@ -348,32 +348,19 @@ class AiTestGeneratorService
         return $files;
     }
 
-    private function getApiKey(): string
-    {
-        $stored = AppSetting::get('ai_anthropic_api_key', '');
-        if (!$stored) {
-            throw new \RuntimeException('Anthropic API key not configured. Go to Settings > AI to add your key.');
-        }
-        try {
-            return Crypt::decryptString($stored);
-        } catch (\Exception) {
-            return $stored;
-        }
-    }
-
     private function parseResponse(array $response): AiGenerationResult
     {
         $content = $response['content'];
         $files = [];
         $suggestions = [];
 
-        preg_match_all('/```(?:javascript|js|typescript|ts|json)\s+file:(.+?)\n(.*?)```/s', $content, $matches, PREG_SET_ORDER);
+        preg_match_all(self::FILE_BLOCK_REGEX, $content, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             $files[trim($match[1])] = trim($match[2]);
         }
 
-        $explanation = preg_replace('/```(?:javascript|js|typescript|ts)\s+file:.+?```/s', '', $content);
+        $explanation = preg_replace(self::FILE_BLOCK_REGEX, '', $content);
         $explanation = trim($explanation);
 
         if (preg_match('/(?:additional tests|suggestions|you could also|consider testing).*?$/is', $explanation, $sugMatch)) {
