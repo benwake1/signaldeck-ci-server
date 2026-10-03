@@ -17,10 +17,12 @@ use App\Enums\VerificationStatus;
 use App\Jobs\VerifyGeneratedTestJob;
 use App\Models\AiConversation;
 use App\Models\ManagedTestFile;
+use App\Support\ManagedSuiteDefaults;
 use App\Models\Project;
 use App\Models\TestRecordingSession;
 use App\Models\TestSuite;
 use App\Models\AppSetting;
+use App\Services\Ai\AiProviderFactory;
 use App\Services\AiTestGeneratorService;
 use App\Services\SiteCrawlerService;
 use Filament\Notifications\Notification;
@@ -66,7 +68,14 @@ class AiTestBuilderPage extends Page
             return false;
         }
 
-        return !empty(AppSetting::get('ai_anthropic_api_key'));
+        return AiProviderFactory::isConfigured();
+    }
+
+    public function conversationTokens(): int
+    {
+        return $this->conversationUlid
+            ? (int) AiConversation::where('ulid', $this->conversationUlid)->value('total_tokens')
+            : 0;
     }
 
     public function mount(): void
@@ -120,6 +129,8 @@ class AiTestBuilderPage extends Page
                 'status' => $c->status->value,
                 'updated_at' => $c->updated_at->diffForHumans(),
                 'is_repair' => $c->user_id === null,
+                'provider' => $c->provider,
+                'model' => $c->model,
             ])
             ->toArray();
     }
@@ -491,7 +502,10 @@ class AiTestBuilderPage extends Page
             if ($existingSuite) {
                 // Update existing managed suite files
                 $existingSuite->update(['runner_type' => $this->framework]);
-                $existingSuite->managedTestFiles()->delete();
+                // Keep hand-edited config files (cypress.config.js etc.); replace the generated specs.
+                $existingSuite->managedTestFiles()->get()
+                    ->reject(fn (ManagedTestFile $f) => ManagedSuiteDefaults::isConfigFile($f->file_path) && !isset($this->generatedFiles[$f->file_path]))
+                    ->each->delete();
 
                 foreach ($this->generatedFiles as $path => $content) {
                     ManagedTestFile::create([
@@ -520,7 +534,9 @@ class AiTestBuilderPage extends Page
                     'source_type' => SourceType::Managed,
                     'runner_type' => $this->framework,
                     'name' => $name,
-                    'spec_pattern' => '**/*.spec.{js,ts}',
+                    // Cypress's builder output is named *.cy.js; Playwright's *.spec.ts.
+                    'spec_pattern' => $this->framework === 'cypress' ? '**/*.cy.{js,ts}' : '**/*.spec.{js,ts}',
+                    'base_url' => $conversation?->crawl_data['url'] ?? null,
                     'active' => true,
                 ]);
 
@@ -529,6 +545,16 @@ class AiTestBuilderPage extends Page
                         'test_suite_id' => $suite->id,
                         'file_path' => $path,
                         'content' => $content,
+                        'generated_by' => auth()->id(),
+                    ]);
+                }
+
+                // Seed an editable Cypress config so per-suite nuance doesn't need code changes.
+                if ($this->framework === 'cypress' && !collect(array_keys($this->generatedFiles))->contains(fn ($p) => str_contains($p, 'cypress.config'))) {
+                    ManagedTestFile::create([
+                        'test_suite_id' => $suite->id,
+                        'file_path' => ManagedSuiteDefaults::CYPRESS_CONFIG_PATH,
+                        'content' => ManagedSuiteDefaults::cypressConfig($suite->base_url, $suite->spec_pattern),
                         'generated_by' => auth()->id(),
                     ]);
                 }
