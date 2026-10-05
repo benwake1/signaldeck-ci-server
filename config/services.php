@@ -25,4 +25,9 @@ return [
         'redirect'      => env('GITHUB_REDIRECT_URI', '/admin/oauth/callback/github'),
     ],
 
+    'pdf' => [
+        // Path to a Chrome/Chromium binary used by Browsershot. Auto-detected when empty.
+        'chrome_path' => env('PDF_CHROME_PATH'),
+    ],
+
 ];

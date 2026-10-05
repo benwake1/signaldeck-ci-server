@@ -32,6 +32,14 @@ Route::prefix('reports')->group(function () {
         ->name('reports.html')
         ->middleware('auth');
 
+    // PDF summary report
+    Route::get('/run/{testRun}/pdf', [ReportController::class, 'pdf'])
+        ->name('reports.pdf')
+        ->middleware('auth');
+
+    Route::get('/share/{testRun}/{token}/pdf', [ReportController::class, 'sharePdf'])
+        ->name('reports.sharePdf');
+
     // Shareable signed URL (no auth required — for client delivery)
     Route::get('/share/{testRun}/{token}', [ReportController::class, 'share'])
         ->name('reports.share');
