@@ -97,6 +97,14 @@ class ReportGeneratorService
 
         $brand = e(config('brand.name') ?: config('app.name'));
 
+        // Chrome writes its profile/crashpad/XDG data under $HOME on launch. The web server
+        // user (e.g. www-data) often has a non-writable home dir, which crashes the browser
+        // before it can render — give it a dedicated writable home instead.
+        $chromeHome = storage_path('app/chrome-home');
+        if (! is_dir($chromeHome)) {
+            mkdir($chromeHome, 0775, true);
+        }
+
         $shot = Browsershot::html($html)
             ->format('A4')
             ->showBackground()
@@ -109,6 +117,7 @@ class ReportGeneratorService
                 . '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>'
             )
             ->noSandbox()
+            ->setNodeEnv(['HOME' => $chromeHome])
             ->timeout(60);
 
         if ($chrome = $this->chromePath()) {
