@@ -635,6 +635,28 @@ A multi-step wizard generates a ready-to-run Cypress or Playwright e-commerce te
 
 ---
 
+## AI Provider (Settings > AI Provider)
+
+The AI Test Builder supports two kinds of provider, chosen by an admin at **Settings > AI Provider**:
+
+- **Anthropic Claude** — highest quality. Defaults to Haiku 4.5 for cost; Sonnet is selectable.
+- **OpenAI-compatible** — Ollama, Groq, Gemini, OpenRouter, or any custom `/chat/completions` endpoint.
+
+### Free / local with Ollama
+
+```bash
+ollama pull qwen2.5-coder:14b
+ollama serve   # http://localhost:11434
+```
+
+Choose *OpenAI-compatible* > *Ollama* preset, then use **Test connection**. Ollama must be reachable from the app server (and the queue worker). Ollama's default context window is small (4,096 tokens on many versions) and it silently truncates longer prompts, so start it with a larger one, e.g. `OLLAMA_CONTEXT_LENGTH=16384 ollama serve`. Small models have limited context: set **Max prompt size** if responses degrade. Hosted free tiers may train on your prompts, so prefer Ollama for client work.
+
+### Cost controls
+
+- **Verification attempts** caps AI fix-up calls per generated test.
+- **Automated repairs per day** caps unattended repairs (0 = unlimited).
+- Token usage is logged (`AI usage`) and shown per conversation in the builder.
+
 ## Running Tests
 
 Runner type is set at the project level. Each run snapshots the runner type at creation time, so historical runs remain valid.

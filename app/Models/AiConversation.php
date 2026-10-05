@@ -33,6 +33,9 @@ class AiConversation extends Model
         'status',
         'verification_status',
         'verification_output',
+        'total_tokens',
+        'provider',
+        'model',
     ];
 
     protected $casts = [

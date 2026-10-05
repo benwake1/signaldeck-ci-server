@@ -37,6 +37,18 @@ class TriggerSuiteRepair implements ShouldQueue
             return;
         }
 
+        // Global daily cap on unattended AI spend (0 = unlimited).
+        $dailyLimit = (int) AppSetting::get('ai_auto_repair_daily_limit', 5);
+        if ($dailyLimit > 0) {
+            $counterKey = 'auto_repair_count_' . now()->toDateString();
+            Cache::add($counterKey, 0, now()->endOfDay());
+
+            if (Cache::increment($counterKey) > $dailyLimit) {
+                Log::info('Skipping automated repair: daily AI repair limit reached', ['suite_id' => $suite->id, 'limit' => $dailyLimit]);
+                return;
+            }
+        }
+
         $cacheKey = "auto_repair_attempted_suite_{$suite->id}";
         if (! Cache::add($cacheKey, true, now()->addDay())) {
             return;

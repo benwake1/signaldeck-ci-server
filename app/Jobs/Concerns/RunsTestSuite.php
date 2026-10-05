@@ -95,7 +95,7 @@ trait RunsTestSuite
         $hasPackageJson = $files->contains(fn ($f) => $f->file_path === 'package.json');
         if (!$hasPackageJson) {
             $deps = $runnerType === \App\Enums\RunnerType::Cypress
-                ? ['cypress' => '^13']
+                ? ['cypress' => '^13', 'mochawesome' => '^7', 'mochawesome-merge' => '^4', 'mocha' => '^10']
                 : ['@playwright/test' => '^1'];
 
             $packageJson = [
@@ -108,6 +108,15 @@ trait RunsTestSuite
                 $this->runPath . '/package.json',
                 json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
             );
+        }
+
+        // Cypress refuses to run without a config file. Builder-generated suites
+        // only contain spec files, so supply a minimal one pointing at the suite's URL.
+        if ($runnerType === \App\Enums\RunnerType::Cypress
+            && !$files->contains(fn ($f) => str_contains($f->file_path, 'cypress.config'))) {
+            $config = \App\Support\ManagedSuiteDefaults::cypressConfig($this->run->testSuite->base_url, (string) $this->run->testSuite->spec_pattern);
+            file_put_contents($this->runPath . '/cypress.config.js', $config);
+            $this->log("📝 Generated default cypress.config.js");
         }
 
         // Generate a minimal playwright.config.ts if none exists in managed files

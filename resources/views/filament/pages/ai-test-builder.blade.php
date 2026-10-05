@@ -1,16 +1,28 @@
 <x-filament-panels::page>
 
     <style>
-        .ai-chat-container{display:flex;gap:1rem;min-height:75vh;position:relative}
+        .ai-chat-container{display:flex;gap:1rem;height:calc(100vh - 12rem);min-height:32rem;position:relative}
         .ai-main{flex:1;display:flex;flex-direction:column;min-width:0}
-        .ai-code-panel{width:45%;max-width:600px;flex-shrink:0;transition:width .2s ease}
-        .chat-messages{flex:1;overflow-y:auto;max-height:60vh;padding:1rem;scroll-behavior:smooth}
+        .ai-code-panel{width:38%;max-width:560px;min-width:320px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;transition:width .2s ease}
+        .ai-main>.fi-section{height:100%;min-height:0}
+        .model-badge{display:inline-flex;align-items:center;padding:.125rem .5rem;border-radius:9999px;font-size:.6875rem;font-weight:500;white-space:nowrap;background:#e0e7ff;color:#3730a3}
+        .dark .model-badge{background:#1e1b4b;color:#a5b4fc}
+        .header-title{flex:1 1 8rem;min-width:6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .chat-messages{flex:1;min-height:0;overflow-y:auto;padding:1rem;scroll-behavior:smooth}
         .chat-bubble{max-width:80%;padding:.75rem 1rem;border-radius:.75rem;margin-bottom:.75rem;word-wrap:break-word;font-size:.875rem;line-height:1.5}
-        .chat-bubble-user{margin-left:auto;background:#3b82f6;color:#fff;border-bottom-right-radius:.25rem;white-space:pre-wrap}
+        .chat-bubble-user{margin-left:auto;background:#3b82f6;color:#fff;border-bottom-right-radius:.25rem}
         .chat-bubble-assistant{margin-right:auto;background:#f3f4f6;color:#1f2937;border-bottom-left-radius:.25rem}
         .dark .chat-bubble-assistant{background:#374151;color:#e5e7eb}
         .chat-bubble pre{background:rgba(0,0,0,.06);border-radius:.5rem;padding:.75rem;overflow-x:auto;margin:.5rem 0;font-size:.8rem;line-height:1.5}
         .dark .chat-bubble pre{background:rgba(0,0,0,.3)}
+        .hljs-keyword,.hljs-selector-tag,.hljs-literal{color:#a626a4}
+        .hljs-string,.hljs-attr,.hljs-regexp{color:#0a6b3a}
+        .hljs-number,.hljs-built_in,.hljs-title,.hljs-property{color:#0b5fc2}
+        .hljs-comment{color:#6b7280;font-style:italic}
+        .dark .chat-bubble .hljs-keyword,.code-display .hljs-keyword{color:#d2a8ff}
+        .dark .chat-bubble .hljs-string,.dark .chat-bubble .hljs-attr,.code-display .hljs-string,.code-display .hljs-attr{color:#a5d6ff}
+        .dark .chat-bubble .hljs-number,.dark .chat-bubble .hljs-built_in,.dark .chat-bubble .hljs-title,.code-display .hljs-number,.code-display .hljs-built_in,.code-display .hljs-title{color:#79c0ff}
+        .dark .chat-bubble .hljs-comment,.code-display .hljs-comment{color:#8b949e}
         .chat-bubble pre code{background:none;padding:0;font-size:inherit;color:inherit}
         .chat-bubble code{background:rgba(0,0,0,.06);padding:.125rem .375rem;border-radius:.25rem;font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
         .dark .chat-bubble code{background:rgba(255,255,255,.1)}
@@ -47,7 +59,7 @@
         .file-tab.active{background:#3b82f6;color:#fff}
         .file-tab:not(.active){background:#e5e7eb;color:#6b7280}
         .dark .file-tab:not(.active){background:#374151;color:#9ca3af}
-        .code-display{background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:.8rem;padding:1rem;overflow:auto;max-height:55vh;border-radius:0 0 .5rem .5rem;white-space:pre;line-height:1.6}
+        .code-display{background:#1e1e1e;color:#d4d4d4;font-family:monospace;font-size:.8rem;padding:1rem;overflow:auto;flex:1;min-height:0;border-radius:0 0 .5rem .5rem;white-space:pre;line-height:1.6}
         .conversation-item{cursor:pointer;padding:.5rem .75rem;border-radius:.375rem;font-size:.8125rem;transition:background .15s;white-space:nowrap}
         .conversation-item:hover{background:#e5e7eb}
         .dark .conversation-item:hover{background:#374151}
@@ -158,6 +170,8 @@
                                     'active' => $conversationUlid === $conv['ulid'],
                                 ])
                                 title="{{ $conv['title'] }} — {{ $conv['updated_at'] }}"
+                                wire:click="loadConversation('{{ $conv['ulid'] }}')"
+                                @click="showSidebar = false"
                             >
                                 {{-- Status dot --}}
                                 <span @class([
@@ -172,13 +186,12 @@
                                         title="Automated repair proposal — not merged, review before accepting"
                                     />
                                 @endif
-                                <span
-                                    wire:click="loadConversation('{{ $conv['ulid'] }}')"
-                                    @click="showSidebar = false"
-                                    class="flex-1 truncate cursor-pointer"
-                                >
+                                <span class="flex-1 truncate">
                                     {{ $conv['title'] }}
                                 </span>
+                                @if($conv['model'] ?? null)
+                                    <span class="model-badge shrink-0" style="font-size:.6rem">{{ \Illuminate\Support\Str::limit(str_replace('claude-', '', $conv['model']), 18, '…') }}</span>
+                                @endif
                                 <button
                                     wire:click.stop="deleteConversation('{{ $conv['ulid'] }}')"
                                     wire:confirm="Delete this conversation?"
@@ -205,8 +218,8 @@
             <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 flex flex-col h-full">
 
                 {{-- Header bar (always visible) --}}
-                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0" style="flex:1 1 22rem">
                         {{-- Sidebar toggle --}}
                         <button
                             @click="showSidebar = true"
@@ -218,13 +231,13 @@
 
                         @if($projectId)
                             {{-- Project name --}}
-                            <span class="text-xs font-medium text-gray-400 dark:text-gray-500">
+                            <span class="text-xs font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap">
                                 {{ \App\Models\Project::find($projectId)?->name }}
                             </span>
                             <span class="text-gray-300 dark:text-gray-600">/</span>
                         @endif
 
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                        <h3 class="header-title text-sm font-semibold text-gray-900 dark:text-white" title="{{ $conversationUlid ? $this->getConversation()?->title : '' }}">
                             @if($conversationUlid)
                                 {{ $this->getConversation()?->title ?? 'Chat' }}
                             @elseif($projectId)
@@ -235,7 +248,7 @@
                         </h3>
 
                         @if($this->getConversation()?->crawl_data)
-                            <span class="crawl-badge">
+                            <span class="crawl-badge shrink-0 whitespace-nowrap" title="{{ $this->getConversation()->crawl_data['url'] ?? '' }}">
                                 <x-heroicon-s-globe-alt class="w-3 h-3" />
                                 Crawled
                             </span>
@@ -245,15 +258,20 @@
                                 Sitemap
                             </span>
                         @endif
+                        @if($this->getConversation()?->model)
+                            <span class="model-badge shrink-0" title="Generated by {{ $this->getConversation()->provider }} / {{ $this->getConversation()->model }}">
+                                {{ $this->getConversation()->model }}{{ $this->getConversation()->provider === 'openai_compatible' ? ' · local' : '' }}
+                            </span>
+                        @endif
                     </div>
 
                     @if($projectId)
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 shrink-0 whitespace-nowrap">
                             {{-- Record a Flow --}}
                             @if(!$recordingToken)
                                 <button
                                     wire:click="startRecording"
-                                    class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900 transition"
+                                    class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900 transition"
                                     title="Record yourself performing a real multi-step flow on the live site"
                                 >
                                     <span class="w-2 h-2 rounded-full bg-rose-500"></span>
@@ -433,7 +451,7 @@
                                             x-html="rendered"
                                         ></div>
                                     @else
-                                        {!! nl2br(e($msg['content'] ?? '')) !!}
+                                        <div style="white-space:pre-line">{{ trim($msg['content'] ?? '') }}</div>
                                     @endif
                                     @if(!empty($msg['timestamp']))
                                         <div class="chat-timestamp">
@@ -479,6 +497,9 @@
                     {{-- Chat input --}}
                     <div class="chat-input-area">
                         @if(!empty($chatMessages) || $conversationUlid)
+                            @if(($tokenTotal = $this->conversationTokens()) > 0)
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ number_format($tokenTotal) }} tokens used in this conversation</p>
+                            @endif
                             {{-- Crawl URL input (compact, for existing conversations without crawl data) --}}
                             @if(!$this->getConversation()?->crawl_data && !$this->getProjectCrawlUrl())
                                 <div class="flex gap-2 mb-2">
@@ -660,8 +681,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/typescript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/json.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css" media="(prefers-color-scheme: light)">
 
     <script>
         // Configure marked with syntax highlighting
