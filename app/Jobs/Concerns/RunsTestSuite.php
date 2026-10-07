@@ -70,6 +70,91 @@ trait RunsTestSuite
         return $keyPath;
     }
 
+    protected function writeManagedFiles(): void
+    {
+        $this->updateStatus(TestRun::STATUS_CLONING);
+        $this->log("📂 Writing managed test files...");
+
+        if (is_dir($this->runPath)) {
+            $this->exec('rm -rf ' . escapeshellarg($this->runPath));
+        }
+        mkdir($this->runPath, 0755, true);
+
+        $files = $this->run->testSuite->managedTestFiles;
+        foreach ($files as $file) {
+            $fullPath = $this->runPath . '/' . $file->file_path;
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            file_put_contents($fullPath, $file->content);
+        }
+
+        $runnerType = $this->run->testSuite->getEffectiveRunnerType();
+
+        $hasPackageJson = $files->contains(fn ($f) => $f->file_path === 'package.json');
+        if (!$hasPackageJson) {
+            $deps = $runnerType === \App\Enums\RunnerType::Cypress
+                ? ['cypress' => '^13', 'mochawesome' => '^7', 'mochawesome-merge' => '^4', 'mocha' => '^10']
+                : ['@playwright/test' => '^1'];
+
+            $packageJson = [
+                'name' => 'managed-test-suite',
+                'private' => true,
+                'dependencies' => $deps,
+            ];
+
+            file_put_contents(
+                $this->runPath . '/package.json',
+                json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+            );
+        }
+
+        // Cypress refuses to run without a config file. Builder-generated suites
+        // only contain spec files, so supply a minimal one pointing at the suite's URL.
+        if ($runnerType === \App\Enums\RunnerType::Cypress
+            && !$files->contains(fn ($f) => str_contains($f->file_path, 'cypress.config'))) {
+            $config = \App\Support\ManagedSuiteDefaults::cypressConfig($this->run->testSuite->base_url, (string) $this->run->testSuite->spec_pattern);
+            file_put_contents($this->runPath . '/cypress.config.js', $config);
+            $this->log("📝 Generated default cypress.config.js");
+        }
+
+        // Generate a minimal playwright.config.ts if none exists in managed files
+        if ($runnerType === \App\Enums\RunnerType::Playwright) {
+            $hasPlaywrightConfig = $files->contains(fn ($f) => str_contains($f->file_path, 'playwright.config'));
+            if (!$hasPlaywrightConfig) {
+                $config = <<<'TS'
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests',
+  timeout: 30_000,
+  retries: 0,
+  use: {
+    headless: true,
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+  },
+  reporter: [['list'], ['json', { outputFile: 'test-results.json' }]],
+});
+TS;
+                file_put_contents($this->runPath . '/playwright.config.ts', $config . "\n");
+                $this->log("📝 Generated default playwright.config.ts");
+            }
+        }
+
+        $this->log("✅ {$files->count()} test files written.");
+    }
+
+    protected function prepareSource(): void
+    {
+        if ($this->run->testSuite->isManaged()) {
+            $this->writeManagedFiles();
+        } else {
+            $this->cloneRepo();
+        }
+    }
+
     protected function installDependencies(): void
     {
         $this->log("📦 Installing npm dependencies...");

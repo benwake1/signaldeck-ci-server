@@ -63,23 +63,9 @@ class FlakyTests extends Page implements HasTable
     {
         $sql = $this->flakyScoreSql;
 
-        // Correlated subquery: fetch last 10 run statuses per test in one DB round-trip,
-        // eliminating the N+1 that buildDotsHtml() previously caused.
-        $recentStatusesSql = "(
-            SELECT GROUP_CONCAT(rs.status)
-            FROM (
-                SELECT tr2.status
-                FROM test_results tr2
-                INNER JOIN test_runs runs2 ON runs2.id = tr2.test_run_id
-                WHERE runs2.project_id = projects.id
-                  AND tr2.full_title = test_results.full_title
-                  AND tr2.spec_file  = test_results.spec_file
-                  AND tr2.status IN ('passed', 'failed')
-                ORDER BY tr2.created_at DESC
-                LIMIT 10
-            ) rs
-        ) as recent_statuses";
-
+        // "Recent statuses" for the dots column are batch-fetched separately (see
+        // getRecentStatusesMap()) once the current page's rows are known, instead of
+        // via a correlated subquery here — see that method's docblock for why.
         $query = TestResult::query()
             ->join('test_runs', 'test_runs.id', '=', 'test_results.test_run_id')
             ->join('projects', 'projects.id', '=', 'test_runs.project_id')
@@ -95,7 +81,6 @@ class FlakyTests extends Page implements HasTable
                 DB::raw("SUM(CASE WHEN test_results.status = 'failed' THEN 1 ELSE 0 END) as fail_count"),
                 DB::raw("{$sql} as flaky_score"),
                 DB::raw('MAX(test_results.created_at) as last_seen'),
-                DB::raw($recentStatusesSql),
             ])
             ->groupBy('test_results.spec_file', 'test_results.full_title', 'projects.id', 'projects.name')
             ->havingRaw('COUNT(*) >= 3')
@@ -142,7 +127,9 @@ class FlakyTests extends Page implements HasTable
                     }),
                 TextColumn::make('recent_runs')
                     ->label('Last 10 Runs')
-                    ->state(fn ($record) => $this->buildDotsHtml($record->recent_statuses ?? ''))
+                    ->state(fn ($record) => $this->buildDotsHtml(
+                        $this->getRecentStatusesMap()[$this->recentStatusesKey($record->project_id, $record->spec_file, $record->full_title)] ?? ''
+                    ))
                     ->html(),
                 TextColumn::make('last_seen')
                     ->label('Last Seen')
@@ -164,12 +151,84 @@ class FlakyTests extends Page implements HasTable
             ])
             ->emptyStateHeading('No flaky tests detected 🎉')
             ->emptyStateDescription('Tests need at least 3 runs with mixed pass/fail results to be flagged as flaky.')
-            ->paginated(false);
+            ->paginated([10, 25, 50])
+            ->defaultPaginationPageOption(25);
+    }
+
+    private ?array $recentStatusesByKey = null;
+
+    private function recentStatusesKey(int $projectId, string $specFile, string $fullTitle): string
+    {
+        return $projectId . '|' . $specFile . '|' . $fullTitle;
     }
 
     /**
-     * Build dot-indicator HTML from a comma-separated status string.
-     * The string is produced by the correlated subquery in table() — no extra DB query needed.
+     * Batch-fetch the last 10 run statuses per (project, spec, title) group, scoped
+     * to only the rows on the current table page.
+     *
+     * This used to be a correlated subquery in the main GROUP BY query, evaluated
+     * once per test_result row. MySQL's "aggregate using temporary table" strategy
+     * ran that subquery during the *pre-aggregation* join — once per source row
+     * (thousands of times), not once per output group — and each execution sorted
+     * every cross-project row sharing the same spec_file/full_title before filtering
+     * by project_id, because full_title/spec_file collide across seeded demo
+     * projects. That's what timed out once test_results grew large; pagination and
+     * indexing alone couldn't fix it because the subquery still ran against the
+     * whole table on every page load.
+     *
+     * Fetching it here instead, once per page render for only the ~10-50 groups
+     * actually displayed, keeps the cost bounded regardless of table growth.
+     */
+    private function getRecentStatusesMap(): array
+    {
+        if ($this->recentStatusesByKey !== null) {
+            return $this->recentStatusesByKey;
+        }
+
+        $tuples = $this->getTableRecords()
+            ->map(fn ($record) => [(int) $record->project_id, $record->spec_file, $record->full_title])
+            ->unique(fn (array $tuple) => implode('|', $tuple))
+            ->values();
+
+        if ($tuples->isEmpty()) {
+            return $this->recentStatusesByKey = [];
+        }
+
+        $placeholders = $tuples->map(fn () => '(?, ?, ?)')->implode(', ');
+        $bindings = $tuples->flatMap(fn (array $tuple) => $tuple)->all();
+
+        $rows = DB::select("
+            SELECT project_id, spec_file, full_title, GROUP_CONCAT(status ORDER BY rn) as recent_statuses
+            FROM (
+                SELECT
+                    runs.project_id,
+                    tr.spec_file,
+                    tr.full_title,
+                    tr.status,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY runs.project_id, tr.spec_file, tr.full_title
+                        ORDER BY tr.created_at DESC
+                    ) as rn
+                FROM test_results tr
+                INNER JOIN test_runs runs ON runs.id = tr.test_run_id
+                WHERE tr.status IN ('passed', 'failed')
+                  AND (runs.project_id, tr.spec_file, tr.full_title) IN ({$placeholders})
+            ) ranked
+            WHERE rn <= 10
+            GROUP BY project_id, spec_file, full_title
+        ", $bindings);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$this->recentStatusesKey((int) $row->project_id, $row->spec_file, $row->full_title)] = $row->recent_statuses;
+        }
+
+        return $this->recentStatusesByKey = $map;
+    }
+
+    /**
+     * Build dot-indicator HTML from a comma-separated status string, newest-first
+     * (see getRecentStatusesMap()).
      */
     private function buildDotsHtml(string $recentStatuses): string
     {

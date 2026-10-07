@@ -9,6 +9,8 @@
 
 namespace App\Models;
 
+use App\Enums\RunnerType;
+use App\Enums\SourceType;
 use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,11 +26,14 @@ class TestSuite extends Model
 
     protected $fillable = [
         'project_id',
+        'source_type',
+        'runner_type',
         'name',
         'slug',
         'description',
         'spec_pattern',
         'branch_override',
+        'base_url',
         'env_variables',
         'playwright_projects',
         'playwright_workers',
@@ -43,6 +48,8 @@ class TestSuite extends Model
     ];
 
     protected $casts = [
+        'source_type' => SourceType::class,
+        'runner_type' => RunnerType::class,
         'active' => 'boolean',
         'timeout_minutes' => 'integer',
         'playwright_projects' => 'array',
@@ -71,6 +78,25 @@ class TestSuite extends Model
     public function testRuns(): HasMany
     {
         return $this->hasMany(TestRun::class);
+    }
+
+    public function managedTestFiles(): HasMany
+    {
+        return $this->hasMany(ManagedTestFile::class);
+    }
+
+    public function isManaged(): bool
+    {
+        return ($this->source_type ?? SourceType::Repo) === SourceType::Managed;
+    }
+
+    /**
+     * The runner type for this suite. Falls back to the project's runner type
+     * when the suite doesn't have its own (i.e. repo-based suites).
+     */
+    public function getEffectiveRunnerType(): RunnerType
+    {
+        return $this->runner_type ?? $this->project->runner_type ?? RunnerType::Cypress;
     }
 
     public function setEnvVariablesAttribute(?array $value): void

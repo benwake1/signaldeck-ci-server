@@ -8,7 +8,7 @@
 /public/storage
 /public/css/
 /public/js/
-/bootstrap/cache/*.php
+/bootstrap/cache/
 
 # -----------------------------------------------
 # Environment & secrets — NEVER commit these
@@ -81,3 +81,7 @@ Homestead.yaml
 # Claude Code
 # -----------------------------------------------
 .claude/
+
+/SignalDeckCI Screenshots/
+
+/test-results

@@ -65,7 +65,7 @@ class TestRunController extends Controller
         $run = TestRun::create([
             'project_id'     => $project->id,
             'test_suite_id'  => $suite->id,
-            'runner_type'    => $project->runner_type,
+            'runner_type'    => $suite->getEffectiveRunnerType(),
             'triggered_by'   => $request->user()->id,
             'trigger_source' => TriggerSource::Manual,
             'storage_disk'   => config('filesystems.default'),

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AiBuilderController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Api\V1\SsoAuthController;
 use App\Http\Controllers\Api\V1\TestGeneratorController;
 use App\Http\Controllers\Api\V1\TestHistoryController;
 use App\Http\Controllers\Api\V1\TestRunController;
+use App\Http\Controllers\Api\V1\TestRecordingController;
 use App\Http\Controllers\Api\V1\TestRunStreamController;
 use App\Http\Controllers\Api\V1\TestSuiteController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -35,6 +37,19 @@ Route::get('health', HealthController::class);
 // ── Webhooks (public, signature-authenticated) ────────────────────────
 Route::post('webhook/trigger', [WebhookController::class, 'trigger'])
     ->name('api.v1.webhook.trigger');
+
+// ── Flow recorder (public, token-scoped) ────────────────────────────────
+// Called from the bookmarklet-injected recorder script running on an
+// arbitrary third-party site — never authenticated, scoped by the
+// unguessable {token} path segment instead. See TestRecordingController.
+Route::prefix('recordings/{token}')->middleware('throttle:recording-actions')->group(function () {
+    Route::get('/', [TestRecordingController::class, 'show'])
+        ->name('api.v1.recordings.show');
+    Route::post('actions', [TestRecordingController::class, 'appendAction'])
+        ->name('api.v1.recordings.actions');
+    Route::post('complete', [TestRecordingController::class, 'complete'])
+        ->name('api.v1.recordings.complete');
+});
 
 // ── Auth ────────────────────────────────────────────────────────────────
 
@@ -96,6 +111,15 @@ Route::middleware(['auth:sanctum', EnsureApiTokenAbility::class.':desktop:write'
 
     // Test suite generator
     Route::post('generate-test-suite', [TestGeneratorController::class, 'generate']);
+
+    // AI Test Builder
+    Route::prefix('ai-builder')->group(function () {
+        Route::post('conversations', [AiBuilderController::class, 'createConversation']);
+        Route::get('conversations/{ulid}', [AiBuilderController::class, 'show']);
+        Route::post('conversations/{ulid}/messages', [AiBuilderController::class, 'sendMessage']);
+        Route::post('conversations/{ulid}/crawl', [AiBuilderController::class, 'crawl']);
+        Route::post('conversations/{ulid}/save-suite', [AiBuilderController::class, 'saveSuite']);
+    });
 });
 
 // ── Admin only ──────────────────────────────────────────────────────────

@@ -27,7 +27,7 @@ class FlakyTestController extends Controller
                 DB::raw('COUNT(*) as total_count'),
                 DB::raw("SUM(CASE WHEN test_results.status = 'passed' THEN 1 ELSE 0 END) as pass_count"),
                 DB::raw("SUM(CASE WHEN test_results.status = 'failed' THEN 1 ELSE 0 END) as fail_count"),
-                DB::raw("ROUND((MIN(SUM(CASE WHEN test_results.status = 'passed' THEN 1 ELSE 0 END), SUM(CASE WHEN test_results.status = 'failed' THEN 1 ELSE 0 END)) * 1.0 / COUNT(*)) * 100, 1) as flakiness_score"),
+                DB::raw("ROUND((CASE WHEN SUM(CASE WHEN test_results.status = 'passed' THEN 1 ELSE 0 END) <= SUM(CASE WHEN test_results.status = 'failed' THEN 1 ELSE 0 END) THEN SUM(CASE WHEN test_results.status = 'passed' THEN 1 ELSE 0 END) ELSE SUM(CASE WHEN test_results.status = 'failed' THEN 1 ELSE 0 END) END * 1.0 / COUNT(*)) * 100, 1) as flakiness_score"),
             )
             ->whereIn('test_runs.status', ['passing', 'failed'])
             ->groupBy('test_runs.project_id', 'test_results.spec_file', 'test_results.full_title')
@@ -42,6 +42,20 @@ class FlakyTestController extends Controller
 
         $page = max(1, min((int) $request->input('page', 1), 10000));
         $results = $query->paginate(50, ['*'], 'page', $page);
+
+        // PDO returns SUM()/ROUND() results as strings (DECIMAL columns are never
+        // auto-cast to avoid precision loss), but the companion app's Codable model
+        // decodes these as Int/Double and has no string-to-number leniency — cast
+        // explicitly so the JSON types match what it expects.
+        $results->getCollection()->transform(function ($row) {
+            $row->project_id = (int) $row->project_id;
+            $row->total_count = (int) $row->total_count;
+            $row->pass_count = (int) $row->pass_count;
+            $row->fail_count = (int) $row->fail_count;
+            $row->flakiness_score = (float) $row->flakiness_score;
+
+            return $row;
+        });
 
         return response()->json($results);
     }

@@ -9,6 +9,7 @@
 
 namespace App\Jobs;
 
+use App\Events\SuiteHealthBelowThreshold;
 use App\Events\SuiteHealthBreached;
 use App\Models\TestRun;
 use Illuminate\Bus\Queueable;
@@ -37,6 +38,10 @@ class CheckSuiteHealthJob implements ShouldQueue
         if ($healthScore >= $suite->pass_rate_threshold) {
             return;
         }
+
+        // Outside the alert cooldown below: automated repair needs to see the
+        // run that completes a failure streak, which is usually within the hour.
+        event(new SuiteHealthBelowThreshold($suite, $healthScore, $suite->pass_rate_threshold));
 
         // Atomically claim the breach slot — only one caller wins even if this job
         // is dispatched twice (e.g. catch + failed() both fire) or runs concurrently.

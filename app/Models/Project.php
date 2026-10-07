@@ -36,6 +36,7 @@ class Project extends Model
         'runner_type',
         'playwright_available_projects',
         'env_variables',
+        'crawl_data',
         'active',
     ];
 
@@ -43,6 +44,7 @@ class Project extends Model
         'active' => 'boolean',
         'runner_type' => RunnerType::class,
         'playwright_available_projects' => 'array',
+        'crawl_data' => 'array',
     ];
 
     protected $hidden = [

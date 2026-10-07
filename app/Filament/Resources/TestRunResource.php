@@ -222,11 +222,11 @@ class TestRunResource extends Resource
                             ->required(),
                     ])
                     ->action(function (array $data) {
-                        $project = \App\Models\Project::find($data['project_id']);
+                        $suite = \App\Models\TestSuite::with('project')->findOrFail($data['test_suite_id']);
                         $run = TestRun::create([
                             'project_id' => $data['project_id'],
                             'test_suite_id' => $data['test_suite_id'],
-                            'runner_type' => $project->runner_type,
+                            'runner_type' => $suite->getEffectiveRunnerType(),
                             'triggered_by' => auth()->id(),
                             'status' => TestRun::STATUS_PENDING,
                             'branch' => $data['branch'],

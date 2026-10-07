@@ -431,6 +431,13 @@ YAML;
                             ->send();
                     }),
 
+                Tables\Actions\Action::make('ai_builder')
+                    ->label('AI Builder')
+                    ->icon('heroicon-o-sparkles')
+                    ->color('primary')
+                    ->url(fn (Project $record) => route('filament.admin.pages.ai-test-builder', ['project_id' => $record->id]))
+                    ->visible(fn () => \App\Filament\Pages\AiTestBuilderPage::canAccess()),
+
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])

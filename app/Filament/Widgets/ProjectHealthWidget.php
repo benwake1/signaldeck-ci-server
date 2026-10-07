@@ -37,7 +37,7 @@ class ProjectHealthWidget extends Widget
         $run = TestRun::create([
             'project_id'     => $projectId,
             'test_suite_id'  => $suiteId,
-            'runner_type'    => $project->runner_type,
+            'runner_type'    => $suite->getEffectiveRunnerType(),
             'triggered_by'   => auth()->id(),
             'trigger_source' => TriggerSource::Manual,
             'storage_disk'   => config('filesystems.default'),
@@ -59,12 +59,15 @@ class ProjectHealthWidget extends Widget
     public function getProjects()
     {
         return Project::with(['client', 'testRuns' => function ($q) {
-            $q->whereIn('status', ['passing', 'failed'])->latest();
+            $q->whereIn('status', ['passing', 'failed'])
+                ->select(['id', 'project_id', 'status', 'created_at', 'failed_tests'])
+                ->latest()
+                ->limit(10);
         }, 'testSuites'])
         ->where('active', true)
         ->get()
         ->map(function ($project) {
-            $runs = $project->testRuns->take(10);
+            $runs = $project->testRuns;
             $latest = $runs->first();
             $passRate = $runs->count() > 0
                 ? round($runs->where('status', 'passing')->count() / $runs->count() * 100)

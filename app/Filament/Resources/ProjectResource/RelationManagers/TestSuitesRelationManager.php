@@ -9,6 +9,10 @@
 
 namespace App\Filament\Resources\ProjectResource\RelationManagers;
 
+use App\Filament\Pages\AiTestBuilderPage;
+use App\Models\AiConversation;
+use App\Models\ManagedTestFile;
+use App\Models\TestSuite;
 use App\Rules\ValidCronExpression;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -43,6 +47,12 @@ class TestSuitesRelationManager extends RelationManager
             Forms\Components\TextInput::make('branch_override')
                 ->label('Branch Override')
                 ->placeholder('Leave blank to use project default'),
+
+            Forms\Components\TextInput::make('base_url')
+                ->label('Base URL')
+                ->url()
+                ->placeholder('https://example.com')
+                ->helperText('The live site this suite tests against. Required for automated repair to verify a proposed fix.'),
 
             Forms\Components\TextInput::make('timeout_minutes')
                 ->label('Timeout (minutes)')
@@ -153,6 +163,43 @@ class TestSuitesRelationManager extends RelationManager
                         ->suffix('%')
                         ->columnSpanFull(),
                 ]),
+
+            Forms\Components\Section::make('Test Files')
+                ->icon('heroicon-o-document-text')
+                ->description('Edit the managed test files for this suite.')
+                ->visible(fn (?TestSuite $record) => $record?->isManaged())
+                ->schema([
+                    Forms\Components\Repeater::make('managed_files')
+                        ->label(false)
+                        ->schema([
+                            Forms\Components\TextInput::make('file_path')
+                                ->label('File Path')
+                                ->required()
+                                ->placeholder('e.g. cypress/e2e/login.spec.js')
+                                ->columnSpanFull(),
+                            Forms\Components\Textarea::make('content')
+                                ->label('Content')
+                                ->required()
+                                ->rows(15)
+                                ->extraAttributes(['style' => 'font-family: ui-monospace, monospace; font-size: 0.8rem; line-height: 1.5;'])
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(1)
+                        ->defaultItems(0)
+                        ->reorderable(false)
+                        ->addActionLabel('Add file')
+                        ->afterStateHydrated(function (Forms\Components\Repeater $component, ?TestSuite $record) {
+                            if (!$record?->isManaged()) {
+                                return;
+                            }
+                            $files = $record->managedTestFiles->map(fn (ManagedTestFile $f) => [
+                                'file_path' => $f->file_path,
+                                'content' => $f->content,
+                            ])->toArray();
+                            $component->state($files);
+                        })
+                        ->columnSpanFull(),
+                ]),
         ])->columns(2);
     }
 
@@ -162,6 +209,20 @@ class TestSuitesRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('ID')->badge()->color('gray'),
                 Tables\Columns\TextColumn::make('name')->searchable()->weight('bold'),
+                Tables\Columns\TextColumn::make('source_type')
+                    ->label('Source')
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => $state instanceof \App\Enums\SourceType ? $state->label() : (\App\Enums\SourceType::tryFrom($state)?->label() ?? 'Repository'))
+                    ->color(fn ($state) => match ($state instanceof \App\Enums\SourceType ? $state : \App\Enums\SourceType::tryFrom($state)) {
+                        \App\Enums\SourceType::Managed => 'warning',
+                        default => 'gray',
+                    }),
+                Tables\Columns\TextColumn::make('runner_type')
+                    ->label('Runner')
+                    ->badge()
+                    ->formatStateUsing(fn ($record) => $record->getEffectiveRunnerType()->label())
+                    ->color(fn ($record) => $record->runner_type ? 'info' : 'gray')
+                    ->tooltip(fn ($record) => $record->runner_type ? 'Suite override' : 'Inherited from project'),
                 Tables\Columns\TextColumn::make('spec_pattern')->limit(40)->copyable(),
                 Tables\Columns\TextColumn::make('branch_override')->placeholder('project default')->badge()->color('warning'),
                 Tables\Columns\TextColumn::make('timeout_minutes')->suffix('m')->label('Timeout'),
@@ -185,7 +246,50 @@ class TestSuitesRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->using(function (TestSuite $record, array $data): TestSuite {
+                        $managedFiles = $data['managed_files'] ?? null;
+                        unset($data['managed_files']);
+
+                        $record->update($data);
+
+                        if ($record->isManaged() && is_array($managedFiles)) {
+                            $record->managedTestFiles()->delete();
+                            foreach ($managedFiles as $fileData) {
+                                $record->managedTestFiles()->create([
+                                    'file_path' => $fileData['file_path'],
+                                    'content' => $fileData['content'],
+                                    'generated_by' => auth()->id(),
+                                ]);
+                            }
+                        }
+
+                        return $record;
+                    }),
+                Tables\Actions\Action::make('aiBuilder')
+                    ->label('AI Builder')
+                    ->icon('heroicon-o-sparkles')
+                    ->color('info')
+                    ->url(function (TestSuite $record): string {
+                        $baseUrl = AiTestBuilderPage::getUrl();
+                        $params = ['project_id' => $record->project_id];
+
+                        // Excludes automated-repair conversations (user_id null, see
+                        // TestRepairService) so a repair proposal never silently
+                        // hijacks this link away from the reviewer's own conversation.
+                        $conversation = AiConversation::where('test_suite_id', $record->id)
+                            ->whereNotNull('user_id')
+                            ->latest()
+                            ->first();
+                        if ($conversation) {
+                            $params['conversation'] = $conversation->ulid;
+                        } else {
+                            $params['suite_id'] = $record->id;
+                        }
+
+                        return $baseUrl . '?' . http_build_query($params);
+                    })
+                    ->visible(fn (TestSuite $record) => $record->isManaged() && AiTestBuilderPage::canAccess()),
                 Tables\Actions\DeleteAction::make(),
             ]);
     }

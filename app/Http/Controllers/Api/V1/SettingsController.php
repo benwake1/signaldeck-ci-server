@@ -102,8 +102,8 @@ class SettingsController extends Controller
 
         try {
             $user = request()->user();
-            Mail::raw('This is a test email from Cypress Dashboard.', function ($message) use ($user) {
-                $message->to($user->email)->subject('Test Email — Cypress Dashboard');
+            Mail::raw('This is a test email from SignalDeck CI.', function ($message) use ($user) {
+                $message->to($user->email)->subject('Test Email — SignalDeck CI');
             });
 
             return response()->json(['message' => 'Test email sent to '.$user->email]);

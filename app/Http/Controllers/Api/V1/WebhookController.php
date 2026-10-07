@@ -57,7 +57,7 @@ class WebhookController extends Controller
             $run = TestRun::create([
                 'project_id'     => $project->id,
                 'test_suite_id'  => $suite->id,
-                'runner_type'    => $project->runner_type,
+                'runner_type'    => $suite->getEffectiveRunnerType(),
                 'trigger_source' => TriggerSource::Webhook,
                 'storage_disk'   => config('filesystems.default'),
                 // triggered_by (user FK) intentionally left null — no authenticated user for webhooks

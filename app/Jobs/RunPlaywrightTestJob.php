@@ -52,7 +52,7 @@ class RunPlaywrightTestJob implements ShouldQueue
         try {
             $this->updateStatus(TestRun::STATUS_CLONING);
 
-            $this->cloneRepo();
+            $this->prepareSource();
             $this->checkCancelled();
 
             $this->updateStatus(TestRun::STATUS_INSTALLING);

@@ -69,7 +69,7 @@ class ScheduledRunCommand extends Command
             $run = TestRun::create([
                 'project_id'     => $suite->project_id,
                 'test_suite_id'  => $suite->id,
-                'runner_type'    => $suite->project->runner_type,
+                'runner_type'    => $suite->getEffectiveRunnerType(),
                 'trigger_source' => TriggerSource::Schedule,
                 'storage_disk'   => config('filesystems.default'),
                 // triggered_by intentionally null — no authenticated user for scheduled runs
