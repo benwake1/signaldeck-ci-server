@@ -1627,7 +1627,7 @@ php artisan queue:restart
 
 #### AI Test Builder: Chromium for the page crawler
 
-The page crawler launches Chromium through the app's own `playwright` npm package. `deploy.sh` downloads the matching Chromium build as the app user on every deploy (a no-op once it's cached), so no manual step is needed.
+The page crawler launches Chromium through the app's own `playwright` npm package. `deploy.sh` downloads the matching Chromium build into `storage/ms-playwright` on every deploy (a no-op once it's there), so no manual step is needed. It lives there rather than in a user's home cache because the crawler runs inside the web request as the PHP-FPM user (`www-data`), not as the app user.
 
 Chromium also needs system libraries, which require root. The install scripts already set these up. On a server that wasn't set up with them, run this once from the app directory:
 
