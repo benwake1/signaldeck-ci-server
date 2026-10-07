@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\DTOs\AiGenerationResult;
+use App\DTOs\CrawlResult;
+use App\Events\SuiteHealthBelowThreshold;
 use App\Events\SuiteHealthBreached;
+use App\Jobs\CheckSuiteHealthJob;
 use App\Jobs\NotifyRepairCompletedJob;
 use App\Jobs\VerifyGeneratedTestJob;
 use App\Listeners\TriggerSuiteRepair;
@@ -16,10 +19,12 @@ use App\Models\TestRun;
 use App\Models\TestSuite;
 use App\Services\AiTestGeneratorService;
 use App\Services\ManagedSuiteService;
+use App\Services\SiteCrawlerService;
 use App\Services\TestRepairService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class AutoRepairEligibilityTest extends TestCase
@@ -37,6 +42,15 @@ class AutoRepairEligibilityTest extends TestCase
 
         AppSetting::set('auto_repair_enabled', '1');
         AppSetting::set('ai_auto_repair_daily_limit', 0);
+
+        $this->app->instance(SiteCrawlerService::class, new class extends SiteCrawlerService {
+            public function __construct() {}
+
+            public function crawl(string $url, array $options = []): CrawlResult
+            {
+                return new CrawlResult($url, 'Login', [['tag' => 'button', 'text' => 'Sign in', 'id' => 'sign-in']], [], [], []);
+            }
+        });
 
         $client = Client::create(['name' => 'C', 'slug' => 'c']);
         $project = Project::create(['client_id' => $client->id, 'name' => 'P', 'slug' => 'p', 'repo_url' => 'https://example.test/r.git', 'default_branch' => 'main']);
@@ -75,7 +89,7 @@ class AutoRepairEligibilityTest extends TestCase
 
     private function breach(): void
     {
-        (new TriggerSuiteRepair())->handle(new SuiteHealthBreached($this->suite, 0.0, 80.0));
+        (new TriggerSuiteRepair())->handle(new SuiteHealthBelowThreshold($this->suite, 0.0, 80.0));
     }
 
     public function test_requires_three_consecutive_failures_by_default(): void
@@ -141,9 +155,29 @@ class AutoRepairEligibilityTest extends TestCase
         $this->assertSame('The login endpoint returns HTTP 500.', $conversation->repair_assessment['reason']);
         $this->assertFalse($conversation->repair_assessment['proposes_fix']);
         $this->assertNull($conversation->verification_status);
+        $this->assertSame('Sign in', $conversation->crawl_data['interactive_elements'][0]['text']);
 
         Bus::assertDispatched(NotifyRepairCompletedJob::class);
         Bus::assertNotDispatched(VerifyGeneratedTestJob::class);
+    }
+
+    public function test_repair_still_runs_when_the_live_page_cannot_be_crawled(): void
+    {
+        $this->app->instance(SiteCrawlerService::class, new class extends SiteCrawlerService {
+            public function __construct() {}
+
+            public function crawl(string $url, array $options = []): CrawlResult
+            {
+                throw new \RuntimeException('net::ERR_NAME_NOT_RESOLVED');
+            }
+        });
+        $this->runs(...array_fill(0, 3, TestRun::STATUS_FAILED));
+        $this->fakeAi('ASSESSMENT: unclear — no page context');
+
+        app(TestRepairService::class)->attemptRepair($this->suite);
+
+        $this->assertSame(['url' => 'https://example.cypress.io'], AiConversation::firstOrFail()->crawl_data);
+        Bus::assertDispatched(NotifyRepairCompletedJob::class);
     }
 
     public function test_files_without_a_drift_assessment_are_not_proposed(): void
@@ -195,5 +229,17 @@ class AutoRepairEligibilityTest extends TestCase
         $this->assertStringContainsString('Proposed fix needs review', $mail->envelope()->subject);
         $mail->assertSeeInHtml('removes, changes or skips checks', false);
         $mail->assertSeeInHtml("cy.get('.welcome').should('be.visible');");
+    }
+
+    public function test_repair_trigger_is_not_throttled_by_the_alert_cooldown(): void
+    {
+        Event::fake([SuiteHealthBelowThreshold::class, SuiteHealthBreached::class]);
+        $this->suite->forceFill(['pass_rate_threshold' => 80, 'last_breach_at' => now()->subMinutes(5)])->save();
+        $this->runs(TestRun::STATUS_FAILED);
+
+        (new CheckSuiteHealthJob(TestRun::firstOrFail()))->handle();
+
+        Event::assertNotDispatched(SuiteHealthBreached::class);
+        Event::assertDispatched(SuiteHealthBelowThreshold::class);
     }
 }

@@ -99,7 +99,7 @@ class TestRepairService
             'title' => "Automated repair: {$suite->name}",
             'framework' => $framework,
             'status' => ConversationStatus::Active,
-            'crawl_data' => ['url' => $suite->base_url],
+            'crawl_data' => $this->crawlLivePage($suite),
             'messages' => $this->seedMessages($managedFiles),
         ]);
 
@@ -168,6 +168,22 @@ class TestRepairService
     }
 
     /**
+     * Snapshot of the live page so the AI can tell a renamed selector (drift)
+     * from a missing feature (regression) instead of guessing from the error
+     * output alone. Best-effort: the repair still runs without it.
+     */
+    private function crawlLivePage(TestSuite $suite): array
+    {
+        try {
+            return app(SiteCrawlerService::class)->crawl($suite->base_url)->toArray();
+        } catch (\Throwable $e) {
+            Log::warning('Automated repair: could not crawl suite base_url', ['suite_id' => $suite->id, 'error' => $e->getMessage()]);
+
+            return ['url' => $suite->base_url];
+        }
+    }
+
+    /**
      * @param Collection<int, ManagedTestFile> $managedFiles
      * @return array<int, array{role: string, content: string, timestamp: string}>
      */
@@ -206,7 +222,7 @@ class TestRepairService
 
         If your assessment is app_regression or unclear, do NOT return any code blocks. Explain what you think is wrong so a human can investigate.
 
-        If your assessment is test_drift, return the updated files, keeping the same test intent and file paths. Never remove, weaken, or skip assertions to get a pass: no deleting expect/should checks, no broadening matchers, no .skip, no inflated timeouts, no try/catch or conditionals that swallow failures. Only update selectors, navigation steps, and expected values where the application has clearly and deliberately changed.
+        If your assessment is test_drift, return the updated files in this same reply, straight after the ASSESSMENT line — don't just describe the change. Give each changed file in full in a fenced block whose opening line is the language followed by `file:<path>` (e.g. ```javascript file:cypress/e2e/example.cy.js), keeping the same test intent and file paths. Never remove, weaken, or skip assertions to get a pass: no deleting expect/should checks, no broadening matchers, no .skip, no inflated timeouts, no try/catch or conditionals that swallow failures. Only update selectors, navigation steps, and expected values where the application has clearly and deliberately changed.
 
         Latest run output:
         {$output}

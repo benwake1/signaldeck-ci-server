@@ -10,7 +10,7 @@
 namespace App\Listeners;
 
 use App\Enums\SourceType;
-use App\Events\SuiteHealthBreached;
+use App\Events\SuiteHealthBelowThreshold;
 use App\Models\AppSetting;
 use App\Services\TestRepairService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 
 class TriggerSuiteRepair implements ShouldQueue
 {
-    public function handle(SuiteHealthBreached $event): void
+    public function handle(SuiteHealthBelowThreshold $event): void
     {
         if (AppSetting::get('auto_repair_enabled', '0') !== '1') {
             return;

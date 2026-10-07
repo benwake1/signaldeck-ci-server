@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\SourceType;
-use App\Events\SuiteHealthBreached;
+use App\Events\SuiteHealthBelowThreshold;
 use App\Listeners\TriggerSuiteRepair;
 use App\Models\AppSetting;
 use App\Models\TestRun;
@@ -39,7 +39,7 @@ class AutoRepairCapTest extends TestCase
         $suite = new TestSuite(array_merge(['source_type' => SourceType::Managed, 'base_url' => 'https://x.test'], $attrs));
         $suite->id = $id;
 
-        (new TriggerSuiteRepair())->handle(new SuiteHealthBreached($suite, 50.0, 80.0));
+        (new TriggerSuiteRepair())->handle(new SuiteHealthBelowThreshold($suite, 50.0, 80.0));
     }
 
     public function test_daily_cap_stops_repairs_after_the_limit(): void
