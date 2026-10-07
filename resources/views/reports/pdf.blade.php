@@ -64,6 +64,13 @@
     table.specs .status { text-align: right; width: 24mm; }
     .spec-name { word-break: break-all; color: #374151; }
     .zero { color: #d1d5db; }
+
+    .spec-row td { background: #f9fafb; font-weight: 700; padding: 2.4mm 2mm; border-bottom: .3mm solid #e5e7eb; }
+    .spec-row .spec-name { color: #111827; }
+    .spec-row .count { font-weight: 400; color: #6b7280; width: auto; white-space: nowrap; }
+    .test-name { color: #374151; }
+    .test-name .suite { display: block; font-size: 7.5pt; color: #9ca3af; margin-top: .3mm; }
+    .duration { text-align: right; width: 18mm; color: #9ca3af; font-size: 8pt; }
     .empty { text-align: center; color: #6b7280; padding: 10mm 0; }
 
     .footer-note { margin: 10mm 16mm 0; padding-top: 4mm; border-top: .3mm solid #e5e7eb; font-size: 8.5pt; color: #6b7280; line-height: 1.6; break-inside: avoid; }
@@ -122,7 +129,7 @@
     </div>
 
     <div class="section-title">
-        <div><h2>Results by Spec</h2></div>
+        <div><h2>Test Results</h2></div>
         <div class="count">{{ $run->total_tests }} tests &nbsp;·&nbsp; {{ $resultsBySpec->count() }} spec(s)</div>
     </div>
 
@@ -132,10 +139,8 @@
         <table class="specs">
             <thead>
                 <tr>
-                    <th>Spec</th>
-                    <th class="num">Passed</th>
-                    <th class="num">Failed</th>
-                    <th class="num">Total</th>
+                    <th>Test</th>
+                    <th class="duration">Duration</th>
                     <th class="status">Status</th>
                 </tr>
             </thead>
@@ -145,15 +150,24 @@
                     $passed = $results->where('status', 'passed')->count();
                     $failed = $results->where('status', 'failed')->count();
                 @endphp
-                <tr>
-                    <td class="spec-name mono">{{ $specFile }}</td>
-                    <td class="num" style="color:#16a34a;font-weight:600">{{ $passed }}</td>
-                    <td class="num {{ $failed ? '' : 'zero' }}" style="{{ $failed ? 'color:#dc2626;font-weight:600' : '' }}">{{ $failed }}</td>
-                    <td class="num">{{ $results->count() }}</td>
-                    <td class="status">
-                        <span class="pill {{ $failed ? 'pill-fail' : 'pill-pass' }}">{{ $failed ? 'Failed' : 'Passed' }}</span>
-                    </td>
+                <tr class="spec-row">
+                    <td colspan="2" class="spec-name mono">{{ $specFile }}</td>
+                    <td class="status count">{{ $passed }} passed @if($failed)&nbsp;·&nbsp;{{ $failed }} failed @endif</td>
                 </tr>
+                @foreach($results as $result)
+                    <tr>
+                        <td class="test-name">
+                            {{ $result->test_title }}
+                            @if($result->suite_title)
+                                <span class="suite">{{ $result->suite_title }}</span>
+                            @endif
+                        </td>
+                        <td class="duration">{{ $result->duration_formatted }}</td>
+                        <td class="status">
+                            <span class="pill {{ $result->isFailed() ? 'pill-fail' : 'pill-pass' }}">{{ $result->isFailed() ? 'Failed' : 'Passed' }}</span>
+                        </td>
+                    </tr>
+                @endforeach
             @endforeach
             </tbody>
         </table>
