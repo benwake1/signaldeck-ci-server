@@ -49,7 +49,10 @@ run_as npm run build --silent
 # A no-op when the matching Chromium build is already there. System libraries
 # (playwright install-deps) need root and are set up by the install scripts.
 echo "▶ Installing Playwright Chromium for the AI page crawler..."
-run_as npx --no-install playwright install chromium
+# Non-fatal: only the crawler needs it, so a failed download must not abort
+# the deploy before migrations and cache rebuilds have run.
+run_as npx --no-install playwright install chromium \
+    || echo "⚠ Chromium download failed — the AI page crawler won't work until the next deploy."
 
 echo "▶ Running database migrations..."
 run_as ${PHP} artisan migrate --force
