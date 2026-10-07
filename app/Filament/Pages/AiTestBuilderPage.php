@@ -24,6 +24,7 @@ use App\Models\TestSuite;
 use App\Models\AppSetting;
 use App\Services\Ai\AiProviderFactory;
 use App\Services\AiTestGeneratorService;
+use App\Services\ManagedSuiteService;
 use App\Services\SiteCrawlerService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -529,35 +530,14 @@ class AiTestBuilderPage extends Page
                     return;
                 }
 
-                $suite = TestSuite::create([
-                    'project_id' => $this->projectId,
-                    'source_type' => SourceType::Managed,
-                    'runner_type' => $this->framework,
-                    'name' => $name,
-                    // Cypress's builder output is named *.cy.js; Playwright's *.spec.ts.
-                    'spec_pattern' => $this->framework === 'cypress' ? '**/*.cy.{js,ts}' : '**/*.spec.{js,ts}',
-                    'base_url' => $conversation?->crawl_data['url'] ?? null,
-                    'active' => true,
-                ]);
-
-                foreach ($this->generatedFiles as $path => $content) {
-                    ManagedTestFile::create([
-                        'test_suite_id' => $suite->id,
-                        'file_path' => $path,
-                        'content' => $content,
-                        'generated_by' => auth()->id(),
-                    ]);
-                }
-
-                // Seed an editable Cypress config so per-suite nuance doesn't need code changes.
-                if ($this->framework === 'cypress' && !collect(array_keys($this->generatedFiles))->contains(fn ($p) => str_contains($p, 'cypress.config'))) {
-                    ManagedTestFile::create([
-                        'test_suite_id' => $suite->id,
-                        'file_path' => ManagedSuiteDefaults::CYPRESS_CONFIG_PATH,
-                        'content' => ManagedSuiteDefaults::cypressConfig($suite->base_url, $suite->spec_pattern),
-                        'generated_by' => auth()->id(),
-                    ]);
-                }
+                $suite = app(ManagedSuiteService::class)->create(
+                    $this->projectId,
+                    $this->framework,
+                    $name,
+                    $this->generatedFiles,
+                    $conversation?->crawl_data['url'] ?? null,
+                    auth()->id(),
+                );
 
                 if ($conversation) {
                     $conversation->update([

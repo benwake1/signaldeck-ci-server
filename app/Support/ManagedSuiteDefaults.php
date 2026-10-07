@@ -6,6 +6,12 @@ class ManagedSuiteDefaults
 {
     public const CYPRESS_CONFIG_PATH = 'cypress.config.js';
 
+    /** Cypress's builder output is named *.cy.js; Playwright's *.spec.ts. */
+    public static function specPattern(string $framework): string
+    {
+        return $framework === 'cypress' ? '**/*.cy.{js,ts}' : '**/*.spec.{js,ts}';
+    }
+
     /** Minimal Cypress config for builder-generated suites, which only contain spec files. */
     public static function cypressConfig(?string $baseUrl, string $specPattern): string
     {

@@ -11,12 +11,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\DTOs\AiGenerationResult;
 use App\Enums\ConversationStatus;
-use App\Enums\SourceType;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
-use App\Models\ManagedTestFile;
-use App\Models\TestSuite;
 use App\Services\AiTestGeneratorService;
+use App\Services\ManagedSuiteService;
 use App\Services\SiteCrawlerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -139,7 +137,7 @@ class AiBuilderController extends Controller
         }
     }
 
-    public function saveSuite(Request $request, string $ulid): JsonResponse
+    public function saveSuite(Request $request, string $ulid, ManagedSuiteService $suites): JsonResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -156,23 +154,14 @@ class AiBuilderController extends Controller
             return response()->json(['error' => 'No generated files found in conversation'], 422);
         }
 
-        $suite = TestSuite::create([
-            'project_id' => $conversation->project_id,
-            'source_type' => SourceType::Managed,
-            'runner_type' => $validated['framework'] ?? $conversation->framework,
-            'name' => $validated['name'],
-            'spec_pattern' => '**/*.spec.{js,ts}',
-            'active' => true,
-        ]);
-
-        foreach ($files as $path => $content) {
-            ManagedTestFile::create([
-                'test_suite_id' => $suite->id,
-                'file_path' => $path,
-                'content' => $content,
-                'generated_by' => $request->user()->id,
-            ]);
-        }
+        $suite = $suites->create(
+            $conversation->project_id,
+            $validated['framework'] ?? $conversation->framework ?? $conversation->project?->runner_type?->value ?? 'cypress',
+            $validated['name'],
+            $files,
+            $conversation->crawl_data['url'] ?? null,
+            $request->user()->id,
+        );
 
         $conversation->update([
             'test_suite_id' => $suite->id,
