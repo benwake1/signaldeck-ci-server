@@ -4,6 +4,9 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 
 [Found a bug? Report it on Fider](https://feedback.signaldeck.tech)
 
+> [!WARNING]
+> **Upgrading from a version without the AI Test Builder?** Updating the code isn't enough. You also need to download Playwright Chromium on the server (and, if your server wasn't set up with the install scripts, install its system libraries as root). Without it, the AI Test Builder's page crawler fails on every crawl. Read [Upgrading from an earlier version](#upgrading-from-an-earlier-version) before you update.
+
 ---
 
 ## Table of Contents
@@ -33,8 +36,9 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 23. [Architecture Overview](#architecture-overview)
 24. [Database Schema](#database-schema)
 25. [Deployment (VPS + Cloudflare)](#deployment)
-26. [Git Repository Setup](#git-repository-setup)
-27. [Troubleshooting](#troubleshooting)
+26. [Upgrading from an earlier version](#upgrading-from-an-earlier-version)
+27. [Git Repository Setup](#git-repository-setup)
+28. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -1614,6 +1618,7 @@ Or manually:
 git pull origin main
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
+PLAYWRIGHT_BROWSERS_PATH=storage/ms-playwright npx playwright install chromium
 php artisan migrate --force
 php artisan filament:assets
 php artisan config:cache
@@ -1627,13 +1632,56 @@ php artisan queue:restart
 
 #### AI Test Builder: Chromium for the page crawler
 
-The page crawler launches Chromium through the app's own `playwright` npm package. `deploy.sh` downloads the matching Chromium build as the app user on every deploy (a no-op once it's cached), so no manual step is needed.
+The page crawler launches Chromium through the app's own `playwright` npm package. Chromium has to be in `storage/ms-playwright`, not a user's home cache, because the crawler runs inside the web request as the PHP-FPM user (`www-data`), not as the app user. The install scripts download it there and install its system libraries. After any update that changes the `playwright` package version, download the matching build again, as the app user, from the app directory:
 
-Chromium also needs system libraries, which require root. The install scripts already set these up. On a server that wasn't set up with them, run this once from the app directory:
+```bash
+PLAYWRIGHT_BROWSERS_PATH=storage/ms-playwright npx playwright install chromium
+```
+
+It does nothing if the right build is already there, so it's safe to run on every update. It's included in the checklist above.
+
+---
+
+## Upgrading from an earlier version
+
+The release that adds the **AI Test Builder** is the first where the web app itself needs a browser on the server. Its page crawler runs Playwright Chromium inside the web request, as the PHP-FPM user (`www-data`). **Updating code alone isn't enough.** Chromium has to be downloaded into `storage/ms-playwright`, and its system libraries have to be installed.
+
+**What breaks if you skip this:** the page crawler in the AI Test Builder. Every crawl fails with `browserType.launch: Executable doesn't exist at …/ms-playwright/…`. Test runs, reports, scheduled runs and the rest of the dashboard are not affected. The builder only shows up once an AI provider is configured, so installs without one won't see the error until they set one up.
+
+**New installs** made with `install.sh` or `install-existing-lemp.sh` need nothing extra; the install scripts download Chromium for you.
+
+### Upgrading an existing install
+
+**1. Update and download Chromium.** Run these as the app user, from the app directory, alongside the usual steps in the [Deployment checklist](#deployment-checklist-every-deploy) (`composer install`, `npm run build`, `migrate`, cache rebuilds, `queue:restart`):
+
+```bash
+git pull origin main
+npm ci
+PLAYWRIGHT_BROWSERS_PATH=storage/ms-playwright npx playwright install chromium
+```
+
+The download is about 150 MB. `npm ci` must come first: Playwright is a new dependency in this release, and the Chromium build has to match the installed version.
+
+**2. Only if your server was *not* set up with `install.sh` / `install-existing-lemp.sh`:** install Chromium's system libraries once, as root, from the app directory:
 
 ```bash
 sudo npx playwright install-deps chromium
 ```
+
+Without these libraries, Chromium is downloaded but can't start because shared libraries are missing. Servers set up with the install scripts already have them.
+
+**3. On every later update:** run the `npx playwright install chromium` line from step 1 again. Each Playwright version needs its own Chromium build, so a `playwright` upgrade without this step breaks the crawler in the same way. When the build is already there it does nothing.
+
+### Checking it worked
+
+```bash
+ls storage/ms-playwright
+# should list chromium-XXXX and chromium_headless_shell-XXXX
+```
+
+Then crawl a page from the AI Test Builder.
+
+> `storage/` is git-ignored, so the download never shows up in `git status`. Because it lives under `storage/` (owned by the app user, group `www-data`), PHP-FPM can read it without any permission changes.
 
 ---
 

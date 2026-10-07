@@ -24,7 +24,13 @@ class SiteCrawlerService
         $nodePath = env('NODE_PATH', 'node');
         $scriptPath = resource_path('scripts/crawl-page.cjs');
 
-        $result = Process::timeout(60)->run([
+        // The crawler runs inside the web request (as the PHP-FPM user), whose
+        // home differs from the app user's, so Playwright's default per-user
+        // browser cache would be empty. deploy.sh downloads Chromium here instead.
+        $browsersPath = storage_path('ms-playwright');
+        $env = is_dir($browsersPath) ? ['PLAYWRIGHT_BROWSERS_PATH' => $browsersPath] : [];
+
+        $result = Process::env($env)->timeout(60)->run([
             $nodePath,
             $scriptPath,
             $url,

@@ -45,13 +45,16 @@ echo "▶ Installing Node dependencies and building assets..."
 run_as npm ci --silent
 run_as npm run build --silent
 
-# Downloads into the app user's ~/.cache/ms-playwright, so no root is needed.
-# A no-op when the matching Chromium build is already there. System libraries
-# (playwright install-deps) need root and are set up by the install scripts.
-echo "▶ Installing Playwright Chromium for the AI page crawler..."
+# Downloads into storage/ms-playwright rather than the app user's home cache:
+# the crawler runs as the PHP-FPM user (www-data), which has a different home
+# and could not find it there. A no-op when the matching build is already
+# present. System libraries (playwright install-deps) need root and are set up
+# by the install scripts.
 # Non-fatal: only the crawler needs it, so a failed download must not abort
 # the deploy before migrations and cache rebuilds have run.
-run_as npx --no-install playwright install chromium \
+echo "▶ Installing Playwright Chromium for the AI page crawler..."
+run_as env PLAYWRIGHT_BROWSERS_PATH="${APP_DIR}/storage/ms-playwright" \
+    npx --no-install playwright install chromium \
     || echo "⚠ Chromium download failed — the AI page crawler won't work until the next deploy."
 
 echo "▶ Running database migrations..."
