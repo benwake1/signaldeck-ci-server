@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<x-filament-panels::page class="fi-test-run-view-page">
     <style>
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes skeletonPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }

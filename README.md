@@ -48,7 +48,7 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 - **Result parsing** — Mochawesome (Cypress) and Playwright JSON reports parsed into the database
 - **Playwright project discovery** — auto-detect available browsers/devices from `playwright.config.ts`
 - **Performance tuning** — admin-only parallel workers and retry overrides for Playwright suites
-- **Branded HTML reports** — fully self-contained, per-client styled reports with a built-in print-to-PDF button
+- **Branded HTML reports** — fully self-contained, per-client styled reports, plus a branded PDF summary (stats and per-spec pass/fail) rendered on demand with headless Chrome
 - **Screenshots & videos** — stored and displayed inline with lightbox modal in reports
 - **Shareable links** — 30-day expiring HMAC-signed URLs for client delivery, no login required
 - **Run comparison** — compare any two completed runs side-by-side to spot regressions
@@ -705,7 +705,7 @@ Generated automatically after every run. Served via an authenticated controller 
 - Per-spec file breakdown with status badges
 - Failure details: error message, stack trace, test code
 - Screenshots and videos in an inline lightbox
-- **Save as PDF** floating button — uses the browser's native print-to-PDF, no server dependencies
+- **PDF Report** — server-rendered summary PDF via Browsershot. Needs `npm install` (Puppeteer, no browser download) and Chrome; set `PDF_CHROME_PATH` if it isn't in a standard location
 
 ### Shareable Links
 

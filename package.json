@@ -19,6 +19,7 @@
         "cypress": "^13",
         "laravel-echo": "^1.16.1",
         "playwright": "^1.60.0",
+        "puppeteer": "^25.12.0",
         "pusher-js": "^8.4.0"
     }
 }

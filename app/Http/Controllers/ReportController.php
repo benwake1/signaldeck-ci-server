@@ -51,6 +51,39 @@ class ReportController
     }
 
     /**
+     * Download the PDF summary report (authenticated).
+     */
+    public function pdf(TestRun $testRun): Response
+    {
+        return $this->pdfResponse($testRun);
+    }
+
+    /**
+     * Download the PDF summary report via a share link (no login).
+     */
+    public function sharePdf(Request $request, TestRun $testRun, string $token): Response
+    {
+        $this->validateShareToken($token, (int) $request->query('expires', 0), $testRun->id);
+
+        return $this->pdfResponse($testRun);
+    }
+
+    private function pdfResponse(TestRun $testRun): Response
+    {
+        if (!$testRun->isComplete()) {
+            abort(404, 'Report not available until the run has finished.');
+        }
+
+        $pdf  = $this->reportGenerator->getPdfReport($testRun);
+        $name = \Illuminate\Support\Str::slug($testRun->project->name . '-run-' . $testRun->id) . '-report.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $name . '"',
+        ]);
+    }
+
+    /**
      * Publicly shareable report (for client delivery without login).
      * Uses a simple token stored on the run for validation.
      */
