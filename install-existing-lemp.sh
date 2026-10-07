@@ -372,6 +372,12 @@ sudo -u "${APP_USER}" COMPOSER_NO_INTERACTION=1 composer install \
 info "Installing Node dependencies and building assets..."
 sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && npm ci && npm run build"
 
+# The AI page crawler runs as PHP-FPM (www-data), so Chromium goes under
+# storage/ rather than the app user's home cache. deploy.sh does the same.
+info "Installing Playwright Chromium for the AI page crawler..."
+sudo -u "${APP_USER}" bash -c "cd ${APP_DIR} && PLAYWRIGHT_BROWSERS_PATH=${APP_DIR}/storage/ms-playwright npx --no-install playwright install chromium" \
+    || warning "Chromium download failed — the AI page crawler won't work until it is downloaded (see the README's upgrade section)."
+
 success "Dependencies installed and assets built."
 
 # -----------------------------------------------------------------------------
