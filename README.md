@@ -19,21 +19,22 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 9. [Deploy Keys (SSH)](#deploy-keys-ssh)
 10. [Roles & Permissions](#roles--permissions)
 11. [Project Walkthrough](#project-walkthrough)
-12. [Running Tests](#running-tests)
-13. [Reports](#reports)
-14. [Scheduled Tasks & Artifact Cleanup](#scheduled-tasks--artifact-cleanup)
-15. [Artisan Commands Reference](#artisan-commands-reference)
-16. [REST API](#rest-api)
-17. [Branding Settings](#branding-settings)
-18. [SSO (Single Sign-On)](#sso-single-sign-on)
-19. [Slack Notifications](#slack-notifications)
-20. [macOS Companion App - SignalDeck CI](#macos-companion-app-signaldeck-ci)
-21. [Project Structure](#project-structure)
-22. [Architecture Overview](#architecture-overview)
-23. [Database Schema](#database-schema)
-24. [Deployment (VPS + Cloudflare)](#deployment)
-25. [Git Repository Setup](#git-repository-setup)
-26. [Troubleshooting](#troubleshooting)
+12. [AI Test Builder](#ai-test-builder)
+13. [Running Tests](#running-tests)
+14. [Reports](#reports)
+15. [Scheduled Tasks & Artifact Cleanup](#scheduled-tasks--artifact-cleanup)
+16. [Artisan Commands Reference](#artisan-commands-reference)
+17. [REST API](#rest-api)
+18. [Branding Settings](#branding-settings)
+19. [SSO (Single Sign-On)](#sso-single-sign-on)
+20. [Slack Notifications](#slack-notifications)
+21. [macOS Companion App - SignalDeck CI](#macos-companion-app-signaldeck-ci)
+22. [Project Structure](#project-structure)
+23. [Architecture Overview](#architecture-overview)
+24. [Database Schema](#database-schema)
+25. [Deployment (VPS + Cloudflare)](#deployment)
+26. [Git Repository Setup](#git-repository-setup)
+27. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -68,6 +69,12 @@ A self-hosted **Cypress & Playwright** testing dashboard built with **Laravel 12
 - **Re-run failures** — re-run only the failing spec files from a completed run
 - **Email notifications** — automated email to the triggering user when a run completes (pass or fail)
 - **Test Suite Generator** — generate a ready-to-run Cypress or Playwright e-commerce test scaffold (Magento-focused) as a downloadable ZIP from the admin UI or API
+- **AI Test Builder** — describe a test in plain English (or record it in the browser) and the AI writes Cypress or Playwright specs, using a crawl of the live page for real selectors
+- **Live verification** — every generated test is run against the target site, with a bounded number of AI fix-up attempts if it fails
+- **Managed suites** — save generated tests as a suite stored in the dashboard itself, no Git repository required
+- **Flow recorder** — a Chrome extension records clicks, inputs and form submits across page loads and turns them into a test
+- **Automated repair** (opt-in) — when a managed suite keeps failing, the AI diagnoses why and, if the tests look out of date, emails a verified fix for human review
+- **Anthropic or OpenAI-compatible AI** — Claude, or any `/chat/completions` endpoint including local Ollama
 
 ---
 
@@ -250,6 +257,17 @@ NPM_PATH=/usr/local/bin/npm
 ```
 
 Find the correct paths with `which node` and `which npm`. These must be the paths accessible to the user running the queue worker and web server. The `deploy.sh` script auto-detects and updates these on each deployment.
+
+### AI Test Builder (optional)
+
+```env
+# Hostnames the builder may crawl and verify against even though they resolve
+# to private IP addresses (self-hosted intranet sites). Comma-separated.
+# Leave empty on hosted installs — private addresses are blocked by default.
+AI_ALLOWED_PRIVATE_HOSTS=
+```
+
+AI provider credentials are not set in `.env`; configure them in **Settings → AI Provider**.
 
 ### Storage
 
@@ -572,13 +590,14 @@ curl -sf -X POST "https://your-domain.com/api/v1/webhook/trigger" \
 | Compare runs                       | ✅    | ✅  |
 | View flaky tests                   | ✅    | ✅  |
 | View test history                  | ✅    | ✅  |
+| Use the AI Test Builder            | ✅    | ✅  |
 | Manage clients                     | ✅    | ❌  |
 | Manage projects                    | ✅    | ❌  |
 | Manage test suites                 | ✅    | ❌  |
 | Playwright performance tuning      | ✅    | ❌  |
 | Manage users                       | ✅    | ❌  |
 | Delete test runs                   | ✅    | ❌  |
-| Manage settings (mail, SSO, Slack) | ✅    | ❌  |
+| Manage settings (mail, SSO, Slack, AI) | ✅ | ❌  |
 | Generate API tokens                | ✅    | ❌  |
 
 Roles are stored as a `role` string on the `users` table (`admin` or `pm`). Manage users at **Admin → Users** in the panel.
@@ -633,16 +652,64 @@ Click **View** on the queued run to open the live view, where console output str
 
 A multi-step wizard generates a ready-to-run Cypress or Playwright e-commerce test suite for Magento-based stores. Select the test scenarios you need, provide your store's base URL and credentials, and download a ZIP containing fully configured spec files and supporting config. Available to Admin and PM roles.
 
+### 6. Build Tests with AI (optional)
+
+**Testing → AI Test Builder** — write or record tests without a repository. See [AI Test Builder](#ai-test-builder).
+
 ---
 
-## AI Provider (Settings > AI Provider)
+## AI Test Builder
+
+**Testing → AI Test Builder** (Admin and PM). The page only appears once an admin has configured an [AI provider](#ai-provider).
+
+### Building a test
+
+1. Select a project.
+2. Optionally **crawl** the page you want to test. The builder loads it in headless Chromium and gives the AI the page's real structure (forms, buttons, links), so generated selectors match the live site.
+3. Describe the test in the chat, e.g. *"log in with an invalid password and check the error message"*. Keep chatting to refine it.
+4. Pick **Playwright** or **Cypress**. Switching converts the existing tests to the other framework.
+5. Save the result as a [managed suite](#managed-suites) (**Save as managed suite**, or **Update Suite** if the conversation is already linked to one), or download it as a ZIP to commit to your own repository.
+
+### Verification
+
+Each time tests are generated, `VerifyGeneratedTestJob` runs them against the live site on the queue. If they fail, the error is sent back to the AI for a fix, up to **Verification attempts** times (Settings → AI Provider). The builder shows the outcome:
+
+- **Verified — passed against the live site**
+- **Not verified — review before saving** (still failing after the allowed fixes)
+- **Not verified — …** when verification was skipped, e.g. no target URL or the test needs extra npm dependencies
+
+Saving is blocked only while verification is still running; unverified tests can still be saved after review.
+
+### Recording a flow
+
+Instead of describing a test, you can record one:
+
+1. Install the **SignalDeck Flow Recorder** Chrome extension once per machine (`chrome://extensions` → Developer mode → **Load unpacked** → select `browser-extension/`). See [`browser-extension/README.md`](browser-extension/README.md).
+2. In the builder, click **Record a Flow**, then use the target site normally. Clicks, field changes and form submits are captured across page loads, including onto other domains such as a payment gateway. Password and other sensitive fields are never recorded.
+3. Open the extension popup and choose **Stop & save recording**, then click **Generate test from recording** in the builder.
+
+Recording sessions expire after 2 hours. Before shipping the extension beyond local development, update the dashboard origin in `browser-extension/manifest.json`.
+
+### Managed suites
+
+A managed suite stores its test files in the database (`managed_test_files`) instead of cloning a Git repository. At run time the files are written to a temporary directory, with a default `cypress.config.js` or `playwright.config.ts` generated if none is included. Otherwise managed suites behave like any other suite: schedules, health thresholds, reports and notifications all work the same.
+
+- The **Source** column on a project's Test Suites tab shows *Managed* or *Repository*.
+- Edit a managed suite's files directly in the suite form (**Test Files**), or click **AI Builder** on the suite to keep refining it in the chat.
+- Set the suite's **Base URL** to the site it tests. It is required for [automated repair](#automated-repair).
+
+### Private and intranet sites
+
+To stop the builder being used to reach internal services, crawling and verification refuse URLs that resolve to private or loopback addresses. To test a self-hosted intranet site, list its hostname in `AI_ALLOWED_PRIVATE_HOSTS`.
+
+### AI Provider
 
 The AI Test Builder supports two kinds of provider, chosen by an admin at **Settings > AI Provider**:
 
 - **Anthropic Claude** — highest quality. Defaults to Haiku 4.5 for cost; Sonnet is selectable.
 - **OpenAI-compatible** — Ollama, Groq, Gemini, OpenRouter, or any custom `/chat/completions` endpoint.
 
-### Free / local with Ollama
+#### Free / local with Ollama
 
 ```bash
 ollama pull qwen2.5-coder:14b
@@ -651,14 +718,14 @@ ollama serve   # http://localhost:11434
 
 Choose *OpenAI-compatible* > *Ollama* preset, then use **Test connection**. Ollama must be reachable from the app server (and the queue worker). Ollama's default context window is small (4,096 tokens on many versions) and it silently truncates longer prompts, so start it with a larger one, e.g. `OLLAMA_CONTEXT_LENGTH=16384 ollama serve`. Small models have limited context: set **Max prompt size** if responses degrade. Hosted free tiers may train on your prompts, so prefer Ollama for client work.
 
-### Cost controls
+#### Cost controls
 
 - **Verification attempts** caps AI fix-up calls per generated test.
 - Token usage is logged (`AI usage`) and shown per conversation in the builder.
 
 ### Automated repair
 
-Off by default. Turn it on under **Settings > AI** (*Automated Repair* section). When a managed suite with a base URL fails its last N runs in a row (**Consecutive failures before repair**, minimum 3), the AI diagnoses the failure. If it judges the tests out of date it proposes a fix, which is verified against the live site and emailed for review. Fixes are never applied automatically. At most one attempt per suite per 24 hours; **Automated repairs per day** caps attempts across all suites (0 = unlimited).
+Off by default. Turn it on under **Settings > AI Provider** (*Automated Repair* section). When a managed suite with a base URL fails its last N runs in a row (**Consecutive failures before repair**, minimum 3), the AI diagnoses the failure. If it judges the tests out of date it proposes a fix, which is verified against the live site and emailed for review. Fixes are never applied automatically. At most one attempt per suite per 24 hours; **Automated repairs per day** caps attempts across all suites (0 = unlimited).
 
 ## Running Tests
 
@@ -893,6 +960,13 @@ Tokens are scoped with abilities. Admin users can generate tokens in **Settings 
 | `GET`  | `/api/v1/settings`               | Read admin settings              |
 | `PUT`  | `/api/v1/settings/slack`         | Update Slack settings            |
 | `PUT`  | `/api/v1/settings/sso`           | Update SSO settings              |
+| `POST` | `/api/v1/ai-builder/conversations` | Start an AI builder conversation (`desktop:write`) |
+| `GET`  | `/api/v1/ai-builder/conversations/{ulid}` | Conversation detail, messages and generated files |
+| `POST` | `/api/v1/ai-builder/conversations/{ulid}/messages` | Send a message; returns the AI's reply and files |
+| `POST` | `/api/v1/ai-builder/conversations/{ulid}/crawl` | Crawl a URL to give the AI live page context |
+| `POST` | `/api/v1/ai-builder/conversations/{ulid}/save-suite` | Save generated files as a managed suite |
+
+The flow recorder uses three unauthenticated endpoints under `/api/v1/recordings/{token}` (`GET /`, `POST /actions`, `POST /complete`). They are scoped by the unguessable session token, which expires after 2 hours, and rate-limited to 120 requests per minute per token.
 
 ---
 
@@ -1001,6 +1075,7 @@ cypress-dashboard/
 │   │   ├── SendTransactionalEmail.php    # send-transactional-email
 │   │   └── TestS3Connection.php          # test-s3-connection
 │   ├── Events/
+│   │   ├── SuiteHealthBelowThreshold.php # Fired on every below-threshold check (drives auto-repair)
 │   │   ├── TestRunStatusChanged.php      # Broadcast: status, counts, report URLs
 │   │   └── TestRunLogReceived.php        # Broadcast: live log lines
 │   ├── Filament/
@@ -1009,6 +1084,8 @@ cypress-dashboard/
 │   │   │   ├── FlakyTests.php            # Flaky test analytics
 │   │   │   ├── TestHistory.php           # Per-test history trend
 │   │   │   ├── TestGeneratorPage.php     # E-commerce test scaffold wizard
+│   │   │   ├── AiTestBuilderPage.php     # AI chat builder, crawl, recording, verification
+│   │   │   ├── AiSettingsPage.php        # AI provider, cost controls, automated repair
 │   │   │   ├── BrandingSettingsPage.php  # Brand colours, logo, and panel customisation
 │   │   │   ├── MailSettingsPage.php      # SMTP mail configuration
 │   │   │   ├── SlackSettingsPage.php     # Slack bot token + notification toggle
@@ -1033,6 +1110,8 @@ cypress-dashboard/
 │   │   │   │   ├── TestHistoryController.php
 │   │   │   │   ├── SettingsController.php
 │   │   │   │   ├── TestGeneratorController.php
+│   │   │   │   ├── AiBuilderController.php
+│   │   │   │   ├── TestRecordingController.php  # Public, token-scoped flow recorder endpoints
 │   │   │   │   ├── UserController.php
 │   │   │   │   └── HealthController.php
 │   │   │   └── ReportController.php      # html(), share() — serves report files
@@ -1042,24 +1121,41 @@ cypress-dashboard/
 │   │   ├── Concerns/
 │   │   │   └── RunsTestSuite.php         # Shared trait: clone, install, stream, cleanup
 │   │   ├── RunCypressTestJob.php         # Cypress: run → parse mochawesome → report
-│   │   └── RunPlaywrightTestJob.php      # Playwright: install browsers → run → parse JSON → report
+│   │   ├── RunPlaywrightTestJob.php      # Playwright: install browsers → run → parse JSON → report
+│   │   ├── VerifyGeneratedTestJob.php    # Runs AI-generated tests against the live site, with AI fix-ups
+│   │   └── NotifyRepairCompletedJob.php  # Emails the outcome of an automated repair
 │   ├── Listeners/
+│   │   ├── TriggerSuiteRepair.php             # Gates and starts automated repair
 │   │   ├── SendTestRunCompletedEmail.php      # Queued email to triggering user on run completion
 │   │   └── SendTestRunSlackNotification.php  # DMs the triggering user on run completion
 │   ├── Models/
+│   │   ├── AiConversation.php           # Builder chat, generated files, verification, repair assessment
 │   │   ├── AppSetting.php               # Key/value store for DB-backed settings
 │   │   ├── Client.php
+│   │   ├── ManagedTestFile.php          # Test files for managed (repo-less) suites
 │   │   ├── Project.php                  # Encrypted deploy key + env vars
 │   │   ├── RunEvent.php                 # Run status change events (SSE streaming)
 │   │   ├── TestRun.php                  # Status constants, URL accessors
+│   │   ├── TestRecordingSession.php     # Flow recorder session (token, captured actions)
 │   │   ├── TestResult.php               # Per-test outcomes, media paths
-│   │   ├── TestSuite.php                # Spec patterns, branch override
+│   │   ├── TestSuite.php                # Spec patterns, branch override, source type
 │   │   └── User.php                     # isAdmin(), isPM(), canAccessPanel()
 │   ├── Providers/Filament/
 │   │   └── AdminPanelProvider.php       # Panel config, nav groups, colours
 │   ├── Enums/
-│   │   └── RunnerType.php               # Cypress | Playwright enum
+│   │   ├── RunnerType.php               # Cypress | Playwright enum
+│   │   ├── SourceType.php               # Repo | Managed
+│   │   ├── VerificationStatus.php       # Outcome of live verification
+│   │   └── RecordingStatus.php
+│   ├── Support/
+│   │   └── UrlSafetyValidator.php       # Blocks crawls/verification of private addresses
 │   └── Services/
+│       ├── Ai/                           # AiProvider interface: Anthropic + OpenAI-compatible
+│       ├── AiTestGeneratorService.php    # Prompts, parses generated files, framework conversion
+│       ├── ManagedSuiteService.php       # Creates managed suites (builder page + API)
+│       ├── SiteCrawlerService.php        # Headless Chromium page crawl for AI context
+│       ├── TestExecutionService.php      # Runs tests in a temp dir for verification
+│       ├── TestRepairService.php         # Diagnose → fix → verify → notify for automated repair
 │       ├── MochawesomeParserService.php  # Parses Cypress merged JSON → TestResult rows
 │       ├── PlaywrightParserService.php   # Parses Playwright JSON → TestResult rows
 │       ├── PlaywrightConfigReaderService.php  # Discovers browser projects from repo config
@@ -1073,6 +1169,9 @@ cypress-dashboard/
 │   ├── migrations/                      # All schema migrations
 │   └── seeders/
 │       └── DatabaseSeeder.php           # Demo users, clients, projects, suites
+├── browser-extension/                   # SignalDeck Flow Recorder (Chrome, load unpacked)
+├── resources/scripts/
+│   └── crawl-page.cjs                   # Playwright script used by SiteCrawlerService
 ├── resources/views/
 │   ├── filament/
 │   │   ├── modals/share-link.blade.php  # Shareable link copy modal
@@ -1124,13 +1223,25 @@ Queue Worker (--queue=cypress)
     ├── SendTestRunCompletedEmail listener → email to triggering user
     └── SendTestRunSlackNotification listener → Slack DM to triggering user
 
+  CheckSuiteHealthJob → SuiteHealthBelowThreshold event
+    └── TriggerSuiteRepair listener (if enabled, streak met, under daily cap)
+          → TestRepairService: crawl page → AI diagnosis → proposed fix
+          → VerifyGeneratedTestJob → NotifyRepairCompletedJob (email for review)
+
+AI Test Builder
+  Chat → AI provider (Anthropic or OpenAI-compatible) → generated spec files
+  Optional crawl (headless Chromium) or recording (browser extension) as context
+  VerifyGeneratedTestJob runs the files against the live site, with AI fix-ups
+  Saved as a managed suite: files in managed_test_files, written to disk at run time
+
 Storage
   ├── local disk (private)   — HTML reports
   └── public disk            — Screenshots + videos (served via /storage/)
 
 AppSetting model (key/value)
   ├── Slack: bot token, notification toggle
-  └── SSO: provider credentials, enabled flags
+  ├── SSO: provider credentials, enabled flags
+  └── AI: provider, model, API key, cost controls, automated repair
 ```
 
 ---
@@ -1151,11 +1262,13 @@ projects
   deploy_key_private (encrypted), deploy_key_public,
   env_variables (encrypted JSON),
   playwright_available_projects (JSON, nullable),
+  crawl_data (JSON, nullable),
   active, deleted_at, timestamps
 
 test_suites
   id, project_id, name, slug, description,
-  spec_pattern, branch_override,
+  source_type (repo|managed), runner_type (nullable, overrides project),
+  spec_pattern, base_url (nullable), branch_override,
   env_variables (encrypted JSON),
   playwright_projects (JSON, nullable),
   playwright_workers (nullable),
@@ -1191,6 +1304,21 @@ users
 
 app_settings
   id, key, value, timestamps
+
+ai_conversations
+  id, ulid, user_id (nullable for automated repairs), project_id, test_suite_id (nullable),
+  title, messages (JSON), crawl_data (JSON), recording_data (JSON),
+  framework, verification_status, verification_output,
+  repair_assessment (JSON), total_tokens, provider, model,
+  status, timestamps
+
+managed_test_files
+  id, test_suite_id, file_path, content, version,
+  generated_by (user_id, nullable), timestamps
+
+test_recording_sessions
+  id, token, project_id, ai_conversation_id (nullable),
+  status, actions (JSON), expires_at, timestamps
 ```
 
 ---
@@ -1496,6 +1624,15 @@ php artisan queue:restart
 ```
 
 > The deploy script also auto-detects `NODE_PATH` and `NPM_PATH` and sets `APP_VERSION` from the latest git tag.
+
+#### AI Test Builder on an existing server
+
+The page crawler launches Chromium through the app's own `playwright` npm package, so the browser must be downloaded once in the app directory, as the user that runs the web server and queue worker. Existing servers also need Playwright's system libraries, which only the install scripts set up. Run once after upgrading, and again whenever the `playwright` version in `package.json` changes:
+
+```bash
+sudo npx playwright install-deps           # as root, from the app directory
+sudo -u www-data npx playwright install chromium
+```
 
 ---
 
