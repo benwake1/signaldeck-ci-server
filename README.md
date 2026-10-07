@@ -654,8 +654,11 @@ Choose *OpenAI-compatible* > *Ollama* preset, then use **Test connection**. Olla
 ### Cost controls
 
 - **Verification attempts** caps AI fix-up calls per generated test.
-- **Automated repairs per day** caps unattended repairs (0 = unlimited).
 - Token usage is logged (`AI usage`) and shown per conversation in the builder.
+
+### Automated repair
+
+Off by default. Turn it on under **Settings > AI** (*Automated Repair* section). When a managed suite with a base URL fails its last N runs in a row (**Consecutive failures before repair**, minimum 3), the AI diagnoses the failure. If it judges the tests out of date it proposes a fix, which is verified against the live site and emailed for review. Fixes are never applied automatically. At most one attempt per suite per 24 hours; **Automated repairs per day** caps attempts across all suites (0 = unlimited).
 
 ## Running Tests
 

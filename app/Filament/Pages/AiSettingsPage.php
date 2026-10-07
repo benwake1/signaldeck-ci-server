@@ -54,6 +54,7 @@ class AiSettingsPage extends Page
             'ai_compat_api_key'           => $this->maskSecret('ai_compat_api_key'),
             'ai_max_context_chars'        => (int) AppSetting::get('ai_max_context_chars', 0),
             'ai_verify_max_attempts'      => (int) AppSetting::get('ai_verify_max_attempts', 2),
+            'auto_repair_enabled'         => AppSetting::get('auto_repair_enabled', '0') === '1',
             'ai_auto_repair_daily_limit'  => (int) AppSetting::get('ai_auto_repair_daily_limit', 5),
             'ai_auto_repair_consecutive_failures' => TestRepairService::requiredConsecutiveFailures(),
         ]);
@@ -165,12 +166,15 @@ class AiSettingsPage extends Page
                             ->minValue(1)
                             ->maxValue(5)
                             ->helperText('How many times a generated test is run against your site. Each failed attempt except the last triggers one more AI call to fix it.'),
+                    ]),
 
-                        Forms\Components\TextInput::make('ai_auto_repair_daily_limit')
-                            ->label('Automated repairs per day')
-                            ->numeric()
-                            ->minValue(0)
-                            ->helperText('Global cap on unattended AI repairs of failing suites. 0 = unlimited.'),
+                Forms\Components\Section::make('Automated Repair')
+                    ->icon('heroicon-o-wrench-screwdriver')
+                    ->description('When a managed suite keeps failing, ask the AI to diagnose it and, if the tests look out of date, propose a verified fix for human review. Fixes are never applied automatically.')
+                    ->schema([
+                        Forms\Components\Toggle::make('auto_repair_enabled')
+                            ->label('Attempt automated repair of failing suites')
+                            ->helperText('Only applies to managed suites with a base URL configured. Runs after the number of consecutive failed runs set below, at most once per suite per 24 hours.'),
 
                         Forms\Components\TextInput::make('ai_auto_repair_consecutive_failures')
                             ->label('Consecutive failures before repair')
@@ -178,6 +182,12 @@ class AiSettingsPage extends Page
                             ->required()
                             ->minValue(TestRepairService::MIN_CONSECUTIVE_FAILURES)
                             ->helperText('A suite\'s most recent runs must all fail (not error) this many times in a row before an automated repair is attempted. Minimum ' . TestRepairService::MIN_CONSECUTIVE_FAILURES . '.'),
+
+                        Forms\Components\TextInput::make('ai_auto_repair_daily_limit')
+                            ->label('Automated repairs per day')
+                            ->numeric()
+                            ->minValue(0)
+                            ->helperText('Global cap on unattended AI repairs across all suites. 0 = unlimited.'),
                     ]),
 
                 Forms\Components\Section::make('Terms & Responsibility')
@@ -188,7 +198,7 @@ class AiSettingsPage extends Page
                             ->content(new HtmlString(
                                 '<div class="text-sm text-gray-600 dark:text-gray-400 space-y-2">'
                                 . '<p><strong>Your provider, your account.</strong> The AI Test Builder connects directly to the provider you configure. '
-                                . 'Any usage and costs are billed to your account with that provider — ' . e(config('brand.name', config('app.name'))) . ' does not process, store, or resell API credits.</p>'
+                                . 'Any usage and costs are billed to your account with that provider — ' . e(config('brand.name') ?: config('app.name')) . ' does not process, store, or resell API credits.</p>'
                                 . '<p><strong>Security.</strong> API keys are encrypted at rest using AES-256-CBC and only decrypted in-memory at the moment of each call. '
                                 . 'They are never exposed in logs, API responses, or browser sessions.</p>'
                                 . '<p><strong>Your responsibility.</strong> You are responsible for your provider account, key security, and any charges. '
@@ -224,6 +234,7 @@ class AiSettingsPage extends Page
         AppSetting::set('ai_max_context_chars', max(0, (int) ($data['ai_max_context_chars'] ?? 0)));
 
         AppSetting::set('ai_verify_max_attempts', max(1, (int) ($data['ai_verify_max_attempts'] ?? 2)));
+        AppSetting::set('auto_repair_enabled', ! empty($data['auto_repair_enabled']) ? '1' : '0');
         AppSetting::set('ai_auto_repair_daily_limit', max(0, (int) ($data['ai_auto_repair_daily_limit'] ?? 5)));
         AppSetting::set('ai_auto_repair_consecutive_failures', max(TestRepairService::MIN_CONSECUTIVE_FAILURES, (int) ($data['ai_auto_repair_consecutive_failures'] ?? 0)));
 

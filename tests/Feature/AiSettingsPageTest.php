@@ -44,6 +44,20 @@ class AiSettingsPageTest extends TestCase
         $this->assertSame('openai_compatible', AppSetting::get('ai_provider'));
     }
 
+    public function test_saves_automated_repair_settings(): void
+    {
+        $this->actingAs($this->admin());
+
+        Livewire::test(AiSettingsPage::class)
+            ->assertFormSet(['auto_repair_enabled' => false])
+            ->fillForm(['auto_repair_enabled' => true, 'ai_auto_repair_consecutive_failures' => 4])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('1', AppSetting::get('auto_repair_enabled'));
+        $this->assertSame('4', (string) AppSetting::get('ai_auto_repair_consecutive_failures'));
+    }
+
     public function test_rejects_non_http_base_url(): void
     {
         $this->actingAs($this->admin());
