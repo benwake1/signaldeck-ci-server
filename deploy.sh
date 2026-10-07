@@ -45,6 +45,12 @@ echo "▶ Installing Node dependencies and building assets..."
 run_as npm ci --silent
 run_as npm run build --silent
 
+# Downloads into the app user's ~/.cache/ms-playwright, so no root is needed.
+# A no-op when the matching Chromium build is already there. System libraries
+# (playwright install-deps) need root and are set up by the install scripts.
+echo "▶ Installing Playwright Chromium for the AI page crawler..."
+run_as npx --no-install playwright install chromium
+
 echo "▶ Running database migrations..."
 run_as ${PHP} artisan migrate --force
 

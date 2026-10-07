@@ -26,7 +26,6 @@
   "content_scripts": [
     {
       "matches": [
-        "https://cypress-dashboard-new.test/*",
         "https://*.signaldeck.app/*"
       ],
       "js": ["content-bridge.js"],

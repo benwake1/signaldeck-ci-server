@@ -33,15 +33,16 @@ That's it — no per-recording setup after this.
 
 ## Before deploying to production
 
-`manifest.json`'s `content_scripts[0].matches` hardcodes the dashboard's own
-origin(s) so `content-bridge.js` only runs there:
+`manifest.json`'s `content_scripts[0].matches` lists the dashboard origin(s)
+where `content-bridge.js` runs:
 
 ```json
 "matches": [
-    "https://cypress-dashboard-new.test/*",
     "https://*.signaldeck.app/*"
 ]
 ```
 
-Replace `*.signaldeck.app` with your real production domain before shipping
-this to anyone other than local dev.
+Replace `*.signaldeck.app` with your real dashboard domain (and add your local
+dev domain, e.g. `https://signaldeck.test/*`, if you record locally). The
+recorder itself needs no changes: it reads the dashboard origin from the
+recording session and never records on the dashboard.

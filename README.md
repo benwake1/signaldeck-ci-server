@@ -1625,13 +1625,14 @@ php artisan queue:restart
 
 > The deploy script also auto-detects `NODE_PATH` and `NPM_PATH` and sets `APP_VERSION` from the latest git tag.
 
-#### AI Test Builder on an existing server
+#### AI Test Builder: Chromium for the page crawler
 
-The page crawler launches Chromium through the app's own `playwright` npm package, so the browser must be downloaded once in the app directory, as the user that runs the web server and queue worker. Existing servers also need Playwright's system libraries, which only the install scripts set up. Run once after upgrading, and again whenever the `playwright` version in `package.json` changes:
+The page crawler launches Chromium through the app's own `playwright` npm package. `deploy.sh` downloads the matching Chromium build as the app user on every deploy (a no-op once it's cached), so no manual step is needed.
+
+Chromium also needs system libraries, which require root. The install scripts already set these up. On a server that wasn't set up with them, run this once from the app directory:
 
 ```bash
-sudo npx playwright install-deps           # as root, from the app directory
-sudo -u www-data npx playwright install chromium
+sudo npx playwright install-deps chromium
 ```
 
 ---

@@ -10,11 +10,6 @@
  * bookmarklet script exactly so both stay behaviorally identical.
  */
 (function () {
-    var DASHBOARD_ORIGINS = ['https://cypress-dashboard-new.test'];
-    if (DASHBOARD_ORIGINS.indexOf(location.origin) !== -1) {
-        return;
-    }
-
     if (window.__signaldeckRecorderActive) {
         return;
     }
@@ -312,10 +307,24 @@
             });
     }
 
+    function isDashboardOrigin(apiBase) {
+        try {
+            return new URL(apiBase).origin === location.origin;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function checkActiveSession() {
         chrome.storage.local.get('activeRecording', function (data) {
             var active = data.activeRecording;
             var isLive = active && active.token && active.expiresAt && active.expiresAt > Date.now();
+
+            // Never record the dashboard itself — its origin comes from the
+            // session, so no dashboard domain is hardcoded in the extension.
+            if (isLive && isDashboardOrigin(active.apiBase)) {
+                return;
+            }
 
             if (isLive && (!state || state.token !== active.token)) {
                 startFor(active);
