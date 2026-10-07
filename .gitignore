@@ -47,6 +47,7 @@ id_rsa
 cypress/videos/
 cypress/screenshots/
 mochawesome-report/
+SignalDeckCI Screenshots/
 
 # -----------------------------------------------
 # PHPUnit
