@@ -30,8 +30,9 @@ class RecentRunsWidget extends BaseWidget
     {
         return $table
             ->query(TestRun::with(['project.client', 'testSuite', 'triggeredBy'])->latest())
-            ->paginated([20, 50, 100])
-            ->poll('5s')
+            ->paginated([10, 20, 50, 100])
+            ->defaultPaginationPageOption(10)
+            ->poll('15s')
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->label('#')
