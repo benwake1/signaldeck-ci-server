@@ -580,6 +580,45 @@
                         </div>
                     </div>
 
+                    {{-- Automated repair assessment --}}
+                    @if($repairAssessment)
+                        @php
+                            $isRegression = ($repairAssessment['assessment'] ?? null) === \App\Services\TestRepairService::ASSESSMENT_APP_REGRESSION;
+                            $proposesFix = $repairAssessment['proposes_fix'] ?? false;
+                            $flagged = array_merge($repairAssessment['removed_assertions'] ?? [], $repairAssessment['added_skips'] ?? []);
+                        @endphp
+                        <div class="mx-4 mt-3 px-3 py-2 rounded-lg text-xs flex items-start gap-2
+                            @if($isRegression) bg-danger-50 text-danger-700 dark:bg-danger-500/10 dark:text-danger-400
+                            @elseif(!$proposesFix || $flagged) bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400
+                            @else bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400
+                            @endif"
+                        >
+                            <x-heroicon-s-wrench-screwdriver class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium">
+                                    @if($isRegression)
+                                        Possible app regression — no test changes proposed
+                                    @elseif(!$proposesFix)
+                                        Cause unclear — no test changes proposed
+                                    @else
+                                        Tests look out of date — fix proposed
+                                    @endif
+                                </div>
+                                @if(!empty($repairAssessment['reason']))
+                                    <div class="mt-0.5 opacity-90">{{ $repairAssessment['reason'] }}</div>
+                                @endif
+                                @if($flagged)
+                                    <div class="mt-1.5 font-medium">This fix removes, changes or skips {{ count($flagged) }} {{ \Illuminate\Support\Str::plural('check', count($flagged)) }}:</div>
+                                    <ul class="mt-0.5 space-y-0.5 max-h-24 overflow-y-auto font-mono text-[.65rem] opacity-90">
+                                        @foreach($flagged as $item)
+                                            <li class="break-all">{{ $item['file'] }}: {{ \Illuminate\Support\Str::limit($item['line'], 140) }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+
                     {{-- Verification status --}}
                     @if($verificationStatus)
                         <div

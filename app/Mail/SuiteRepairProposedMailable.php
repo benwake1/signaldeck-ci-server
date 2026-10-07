@@ -14,6 +14,7 @@ use App\Filament\Pages\AiTestBuilderPage;
 use App\Models\AiConversation;
 use App\Models\AppSetting;
 use App\Models\TestSuite;
+use App\Services\TestRepairService;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
@@ -34,14 +35,20 @@ class SuiteRepairProposedMailable extends Mailable
         $fromAddress = AppSetting::get('mail_from_address') ?: config('mail.from.address');
         $fromName    = AppSetting::get('mail_from_name') ?: config('mail.from.name');
 
-        $statusLabel = $this->conversation->verification_status === VerificationStatus::Passed
-            ? 'Verified fix ready for review'
-            : 'Proposed fix needs review';
+        $assessment = $this->conversation->repair_assessment ?? [];
+
+        $statusLabel = match (true) {
+            ($assessment['assessment'] ?? null) === TestRepairService::ASSESSMENT_APP_REGRESSION => 'Possible app regression — no test changes proposed',
+            isset($assessment['proposes_fix']) && !$assessment['proposes_fix'] => 'Suite failing — needs investigation',
+            $this->conversation->verification_status === VerificationStatus::Passed => 'Verified fix ready for review',
+            default => 'Proposed fix needs review',
+        };
 
         return new Envelope(
             from: new Address($fromAddress, $fromName),
             subject: sprintf(
-                '🔧 %s — %s / %s',
+                '%s %s — %s / %s',
+                ($assessment['proposes_fix'] ?? true) ? '🔧' : '⚠️',
                 $statusLabel,
                 $this->suite->project->name ?? 'Unknown',
                 $this->suite->name

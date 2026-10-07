@@ -14,6 +14,7 @@ use App\Models\AppSetting;
 use App\Services\Ai\AiProviderFactory;
 use App\Services\Ai\AnthropicProvider;
 use App\Services\Ai\OpenAiCompatibleProvider;
+use App\Services\TestRepairService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -54,6 +55,7 @@ class AiSettingsPage extends Page
             'ai_max_context_chars'        => (int) AppSetting::get('ai_max_context_chars', 0),
             'ai_verify_max_attempts'      => (int) AppSetting::get('ai_verify_max_attempts', 2),
             'ai_auto_repair_daily_limit'  => (int) AppSetting::get('ai_auto_repair_daily_limit', 5),
+            'ai_auto_repair_consecutive_failures' => TestRepairService::requiredConsecutiveFailures(),
         ]);
     }
 
@@ -169,6 +171,13 @@ class AiSettingsPage extends Page
                             ->numeric()
                             ->minValue(0)
                             ->helperText('Global cap on unattended AI repairs of failing suites. 0 = unlimited.'),
+
+                        Forms\Components\TextInput::make('ai_auto_repair_consecutive_failures')
+                            ->label('Consecutive failures before repair')
+                            ->numeric()
+                            ->required()
+                            ->minValue(TestRepairService::MIN_CONSECUTIVE_FAILURES)
+                            ->helperText('A suite\'s most recent runs must all fail (not error) this many times in a row before an automated repair is attempted. Minimum ' . TestRepairService::MIN_CONSECUTIVE_FAILURES . '.'),
                     ]),
 
                 Forms\Components\Section::make('Terms & Responsibility')
@@ -216,6 +225,7 @@ class AiSettingsPage extends Page
 
         AppSetting::set('ai_verify_max_attempts', max(1, (int) ($data['ai_verify_max_attempts'] ?? 2)));
         AppSetting::set('ai_auto_repair_daily_limit', max(0, (int) ($data['ai_auto_repair_daily_limit'] ?? 5)));
+        AppSetting::set('ai_auto_repair_consecutive_failures', max(TestRepairService::MIN_CONSECUTIVE_FAILURES, (int) ($data['ai_auto_repair_consecutive_failures'] ?? 0)));
 
         Notification::make()
             ->title('AI settings saved')

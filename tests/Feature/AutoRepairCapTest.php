@@ -6,6 +6,7 @@ use App\Enums\SourceType;
 use App\Events\SuiteHealthBreached;
 use App\Listeners\TriggerSuiteRepair;
 use App\Models\AppSetting;
+use App\Models\TestRun;
 use App\Models\TestSuite;
 use App\Services\TestRepairService;
 use Illuminate\Support\Facades\Artisan;
@@ -25,6 +26,7 @@ class AutoRepairCapTest extends TestCase
         $this->spy = new class extends TestRepairService {
             public array $repaired = [];
             public function __construct() {}
+            public function failingRunForRepair(TestSuite $suite): ?TestRun { return new TestRun(['status' => TestRun::STATUS_FAILED]); }
             public function attemptRepair(TestSuite $suite): void { $this->repaired[] = $suite->id; }
         };
         $this->app->instance(TestRepairService::class, $this->spy);

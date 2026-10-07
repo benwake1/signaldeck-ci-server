@@ -55,6 +55,7 @@ class AiTestBuilderPage extends Page
     public ?string $verificationStatus = null;
     public ?string $verificationLabel = null;
     public ?string $verificationOutput = null;
+    public ?array $repairAssessment = null;
     public array $envVarsNeeded = [];
 
     public ?int $recordingSessionId = null;
@@ -229,8 +230,10 @@ class AiTestBuilderPage extends Page
 
     public function loadConversation(string $ulid): void
     {
+        // Automated-repair conversations (user_id null) are shared with every
+        // builder user — the repair email links straight to them.
         $conversation = AiConversation::where('ulid', $ulid)
-            ->where('user_id', auth()->id())
+            ->where(fn ($q) => $q->where('user_id', auth()->id())->orWhereNull('user_id'))
             ->first();
 
         if (!$conversation) {
@@ -674,6 +677,7 @@ class AiTestBuilderPage extends Page
         $this->verificationStatus = $status?->value;
         $this->verificationLabel = $status?->label();
         $this->verificationOutput = $conversation?->verification_output;
+        $this->repairAssessment = $conversation?->repair_assessment;
     }
 
     private function rebuildFilesFromMessages(): void

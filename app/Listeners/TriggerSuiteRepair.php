@@ -37,6 +37,14 @@ class TriggerSuiteRepair implements ShouldQueue
             return;
         }
 
+        // Checked before the cap/cooldown so an early breach (one or two
+        // failures) doesn't burn the suite's daily attempt.
+        $repairs = app(TestRepairService::class);
+        if (! $repairs->failingRunForRepair($suite)) {
+            Log::info('Skipping automated repair: not enough consecutive failed runs yet', ['suite_id' => $suite->id]);
+            return;
+        }
+
         // Global daily cap on unattended AI spend (0 = unlimited).
         $dailyLimit = (int) AppSetting::get('ai_auto_repair_daily_limit', 5);
         if ($dailyLimit > 0) {
@@ -54,6 +62,6 @@ class TriggerSuiteRepair implements ShouldQueue
             return;
         }
 
-        app(TestRepairService::class)->attemptRepair($suite);
+        $repairs->attemptRepair($suite);
     }
 }

@@ -36,6 +36,7 @@ class AiConversation extends Model
         'total_tokens',
         'provider',
         'model',
+        'repair_assessment',
     ];
 
     protected $casts = [
@@ -44,6 +45,7 @@ class AiConversation extends Model
         'recording_data'       => 'array',
         'status'               => ConversationStatus::class,
         'verification_status'  => VerificationStatus::class,
+        'repair_assessment'    => 'array',
     ];
 
     protected static function booted(): void
